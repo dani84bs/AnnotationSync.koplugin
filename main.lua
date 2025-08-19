@@ -171,7 +171,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                                     return {}
                                 end
                                 local ok, data = pcall(json.decode, content)
-                                return ok and data or {}
+                                if ok and type(data) == "table" then
+                                    -- If this is a Dropbox error object, treat as empty
+                                    if data.error_summary or (data.error and type(data.error) == "table") then
+                                        return {}
+                                    end
+                                    return data
+                                end
+                                return {}
                             end
                             local local_map = read_json(local_file)
                             local cached_map = read_json(cached_file)
