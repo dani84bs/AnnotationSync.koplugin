@@ -1,5 +1,17 @@
 local M = {}
 
+function M.annotation_map_to_list(map)
+    local list = {}
+    if type(map) == "table" then
+        for _, ann in pairs(map) do
+            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" then
+                table.insert(list, ann)
+            end
+        end
+    end
+    return list
+end
+
 function M.insert_after_statistics(order_table, key)
     local pos = 1
     for index, value in ipairs(order_table.tools) do

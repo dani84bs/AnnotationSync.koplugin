@@ -197,6 +197,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             for k, v in pairs(local_map) do
                                 merged[k] = v
                             end
+                            -- Convert merged map to list and apply to current book, save, then reload
+                            if self and self.ui and self.ui.annotation then
+                                local utils = require("utils")
+                                local merged_list = utils.annotation_map_to_list(merged)
+                                self.ui.annotation.annotations = merged_list
+                                self.ui.annotation:onSaveSettings()
+                                self.ui:reloadDocument()
+                            end
                             -- Save merged result to local_file
                             local f = io.open(local_file, "w")
                             if f then
