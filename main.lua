@@ -159,7 +159,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                         local utils = require("utils")
                         local json = require("json")
                         local sync_cb = function(local_file, cached_file, income_file)
-                            -- Read all three files
+                            -- Read all three files, handle missing gracefully
                             local function read_json(path)
                                 local f = io.open(path, "r")
                                 if not f then
@@ -167,12 +167,25 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                                 end
                                 local content = f:read("*a")
                                 f:close()
+                                if not content or content == "" then
+                                    return {}
+                                end
                                 local ok, data = pcall(json.decode, content)
                                 return ok and data or {}
                             end
                             local local_map = read_json(local_file)
                             local cached_map = read_json(cached_file)
                             local income_map = read_json(income_file)
+                            -- If income_map or cached_map are missing, treat as empty
+                            if type(local_map) ~= "table" then
+                                local_map = {}
+                            end
+                            if type(cached_map) ~= "table" then
+                                cached_map = {}
+                            end
+                            if type(income_map) ~= "table" then
+                                income_map = {}
+                            end
                             -- Merge logic: local wins, then income, then cached
                             local merged = {}
                             for k, v in pairs(cached_map) do
