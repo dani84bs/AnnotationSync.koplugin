@@ -7,6 +7,13 @@ local AnnotationSyncPlugin = WidgetContainer:extend{
     name = "AnnotationSync"
 }
 
+local filemanager_order = require("ui/elements/filemanager_menu_order")
+local reader_order = require("ui/elements/reader_menu_order")
+
+local utils = require("plugins/AnnotationSync.koplugin/utils")
+utils.insert_after_statistics(filemanager_order, "annotation_sync_plugin")
+utils.insert_after_statistics(reader_order, "annotation_sync_plugin")
+
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
 end
