@@ -97,14 +97,15 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 local SyncService = require("apps/cloudstorage/syncservice")
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
-                    -- Save the chosen cloud provider type and directory path to settings
+                    -- Save the full server object to settings for later sync/upload
+                    G_reader_settings:saveSetting("cloud_server_object", require("json").encode(server))
                     G_reader_settings:saveSetting("cloud_download_dir", server.url)
                     if server.type then
                         G_reader_settings:saveSetting("cloud_provider_type", server.type)
                     end
                     UIManager:show(InfoMessage:new{
                         text = T(_(
-                            "Cloud download directory set to:\n%1\nProvider: %2\nPlease restart KOReader for changes to take effect."),
+                            "Cloud destination set to:\n%1\nProvider: %2\nPlease restart KOReader for changes to take effect."),
                             server.url, server.type or "unknown"),
                         timeout = 4
                     })
@@ -139,26 +140,64 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end
                 -- Build annotation map from current annotations
                 local annotation_map = utils.build_annotation_map(stored_annotations)
-                -- Retrieve cloud annotations
                 local docsettings = require("frontend/docsettings")
                 local sdr_dir = docsettings:getSidecarDir(file)
-                local cloud_data = readCloudJson(sdr_dir, hash)
-                local cloud_map = utils.build_annotation_map(cloud_data)
-                -- Merge cloud and local annotation maps
-                local merged_map = {}
-                for k, v in pairs(annotation_map) do
-                    merged_map[k] = v
-                end
-                for k, v in pairs(cloud_map) do
-                    merged_map[k] = v
-                end
                 if sdr_dir and sdr_dir ~= "" then
                     local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
                     local json_path = sdr_dir .. "/" .. annotation_filename
+                    -- Save only local annotations for now; merge will happen in sync callback
                     local f = io.open(json_path, "w")
                     if f then
-                        f:write(require("json").encode(merged_map))
+                        f:write(require("json").encode(annotation_map))
                         f:close()
+                    end
+                    -- Upload and merge in sync callback
+                    local server_json = G_reader_settings:readSetting("cloud_server_object")
+                    if server_json and server_json ~= "" then
+                        local server = require("json").decode(server_json)
+                        local SyncService = require("apps/cloudstorage/syncservice")
+                        local utils = require("utils")
+                        local json = require("json")
+                        local sync_cb = function(local_file, cached_file, income_file)
+                            -- Read all three files
+                            local function read_json(path)
+                                local f = io.open(path, "r")
+                                if not f then
+                                    return {}
+                                end
+                                local content = f:read("*a")
+                                f:close()
+                                local ok, data = pcall(json.decode, content)
+                                return ok and data or {}
+                            end
+                            local local_map = read_json(local_file)
+                            local cached_map = read_json(cached_file)
+                            local income_map = read_json(income_file)
+                            -- Merge logic: local wins, then income, then cached
+                            local merged = {}
+                            for k, v in pairs(cached_map) do
+                                merged[k] = v
+                            end
+                            for k, v in pairs(income_map) do
+                                merged[k] = v
+                            end
+                            for k, v in pairs(local_map) do
+                                merged[k] = v
+                            end
+                            -- Save merged result to local_file
+                            local f = io.open(local_file, "w")
+                            if f then
+                                f:write(json.encode(merged))
+                                f:close()
+                            end
+                            return true
+                        end
+                        SyncService.sync(server, json_path, sync_cb, false)
+                    else
+                        UIManager:show(InfoMessage:new{
+                            text = T(_("No cloud destination set in settings.")),
+                            timeout = 4
+                        })
                     end
                 end
             end
