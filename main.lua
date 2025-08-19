@@ -1,3 +1,56 @@
+local function getInMemoryAnnotations(document)
+    local json = require("json")
+    local candidates = {"highlights", "annotations", "notes", "info", "_document"}
+    local found = {}
+    if document then
+        for _, key in ipairs(candidates) do
+            local value = document[key]
+            if value ~= nil then
+                found[key] = value
+            end
+        end
+    end
+    return found
+end
+local function flushDocumentMetadata(document)
+    local docsettings = require("frontend/docsettings")
+    if document and document.file then
+        local ds = docsettings:open(document.file)
+        if ds and type(ds.flush) == "function" then
+            pcall(function()
+                ds:flush()
+            end)
+        end
+    end
+end
+local function getBookAnnotations(document)
+    if document and type(document.getAnnotations) == "function" then
+        local ok, result = pcall(function()
+            return document:getAnnotations()
+        end)
+        if ok and type(result) == "table" then
+            return result
+        end
+    end
+    return {}
+end
+local function readCloudJson(dir, hash)
+    local json_path = dir .. "/" .. hash .. ".json"
+    local lfs = require("libs/libkoreader-lfs")
+    local json = require("json")
+    if lfs.attributes(json_path, "mode") == "file" then
+        local f = io.open(json_path, "r")
+        if f then
+            local content = f:read("*a")
+            f:close()
+            local ok, data = pcall(json.decode, content)
+            if ok and type(data) == "table" then
+                return data
+            end
+        end
+    end
+    return {}
+end
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -26,6 +79,20 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
         sub_item_table = {{
             text = _("Settings"),
             callback = function()
+                -- ...existing code...
+                local doc_settings_annotations = nil
+                if self and self.ui and self.ui.doc_settings and self.ui.doc_settings.data and
+                    self.ui.doc_settings.data.annotations then
+                    doc_settings_annotations = self.ui.doc_settings.data.annotations
+                end
+                local doc_settings_annotations_str = require("json").encode(doc_settings_annotations)
+                local annotation_annotations = nil
+                if self and self.ui and self.ui.annotation and self.ui.annotation.annotations then
+                    annotation_annotations = self.ui.annotation.annotations
+                end
+                local annotation_annotations_str = require("json").encode(annotation_annotations)
+                local in_memory = getInMemoryAnnotations(document)
+                local in_memory_str = require("json").encode(in_memory)
                 local plugin = self
                 local SyncService = require("apps/cloudstorage/syncservice")
                 local sync_service = SyncService:new{}
@@ -49,20 +116,52 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             text = _("Manual Sync"),
             enabled = (G_reader_settings:readSetting("cloud_download_dir") or "") ~= "",
             callback = function()
-                local dir = G_reader_settings:readSetting("cloud_download_dir")
+                local document = self and self.ui and self.ui.document
+                local file = document and document.file or _("No file open")
+                local hash = file and type(file) == "string" and require("util").partialMD5(file) or _("No hash")
+                flushDocumentMetadata(document)
                 local msg
-                if dir and dir ~= "" then
-                    msg = T(_("Current cloud directory:\n%1"), dir)
-                else
-                    msg = _("No cloud directory selected.")
+                local data = {}
+                local book_annotations = getBookAnnotations(document)
+                local annotation_type = "nil"
+                local annotation_len = 0
+                local annotation_dump = "nil"
+                local annotations = nil
+                local stored_annotations = {}
+                if self and self.ui and self.ui.annotation and self.ui.annotation.annotations then
+                    annotations = self.ui.annotation.annotations
+                    if type(annotations) == "table" then
+                        stored_annotations = annotations
+                    end
                 end
-                UIManager:show(InfoMessage:new{
-                    text = msg,
-                    timeout = 3
-                })
+                -- Build annotation map from current annotations
+                local annotation_map = utils.build_annotation_map(stored_annotations)
+                -- Retrieve cloud annotations
+                local docsettings = require("frontend/docsettings")
+                local sdr_dir = docsettings:getSidecarDir(file)
+                local cloud_data = readCloudJson(sdr_dir, hash)
+                local cloud_map = utils.build_annotation_map(cloud_data)
+                -- Merge cloud and local annotation maps
+                local merged_map = {}
+                for k, v in pairs(annotation_map) do
+                    merged_map[k] = v
+                end
+                for k, v in pairs(cloud_map) do
+                    merged_map[k] = v
+                end
+                if sdr_dir and sdr_dir ~= "" then
+                    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+                    local json_path = sdr_dir .. "/" .. annotation_filename
+                    local f = io.open(json_path, "w")
+                    if f then
+                        f:write(require("json").encode(merged_map))
+                        f:close()
+                    end
+                end
             end
         }}
     }
 end
 
 return AnnotationSyncPlugin
+
