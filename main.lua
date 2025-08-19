@@ -97,12 +97,15 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 local SyncService = require("apps/cloudstorage/syncservice")
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
-                    -- Save the chosen cloud directory path to settings
+                    -- Save the chosen cloud provider type and directory path to settings
                     G_reader_settings:saveSetting("cloud_download_dir", server.url)
+                    if server.type then
+                        G_reader_settings:saveSetting("cloud_provider_type", server.type)
+                    end
                     UIManager:show(InfoMessage:new{
                         text = T(_(
-                            "Cloud download directory set to:\n%1\nPlease restart KOReader for changes to take effect."),
-                            server.url),
+                            "Cloud download directory set to:\n%1\nProvider: %2\nPlease restart KOReader for changes to take effect."),
+                            server.url, server.type or "unknown"),
                         timeout = 4
                     })
                     UIManager:close()
