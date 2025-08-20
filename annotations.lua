@@ -50,20 +50,6 @@ function M.build_annotation_map(annotations)
     return map
 end
 
-function M.get_in_memory_annotations(document)
-    local candidates = {"highlights", "annotations", "notes", "info", "_document"}
-    local found = {}
-    if document then
-        for _, key in ipairs(candidates) do
-            local value = document[key]
-            if value ~= nil then
-                found[key] = value
-            end
-        end
-    end
-    return found
-end
-
 function M.flush_metadata(document)
     if document and document.file then
         local ds = docsettings:open(document.file)
@@ -73,18 +59,6 @@ function M.flush_metadata(document)
             end)
         end
     end
-end
-
-function M.get_book_annotations(document)
-    if document and type(document.getAnnotations) == "function" then
-        local ok, result = pcall(function()
-            return document:getAnnotations()
-        end)
-        if ok and type(result) == "table" then
-            return result
-        end
-    end
-    return {}
 end
 
 function M.sync_callback(self, local_file, cached_file, income_file)
