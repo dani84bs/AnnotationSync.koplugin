@@ -88,6 +88,30 @@ local function annotation_changed(a, b)
     return false
 end
 
+-- Returns true if two highlights intersect (XPath and character offsets)
+local function positions_intersect(a, b)
+    if not a or not b or not a.pos0 or not a.pos1 or not b.pos0 or not b.pos1 then
+        return false
+    end
+    local function parse_xpath_offset(pos)
+        -- Example: /body/DocFragment[2]/body/section/h1/text().0
+        local xpath, offset = string.match(pos, "^(.-)%.(%d+)$")
+        return xpath, tonumber(offset)
+    end
+    local a_xpath, a_start = parse_xpath_offset(a.pos0)
+    local _, a_end = parse_xpath_offset(a.pos1)
+    local b_xpath, b_start = parse_xpath_offset(b.pos0)
+    local _, b_end = parse_xpath_offset(b.pos1)
+    if not a_xpath or not a_start or not a_end or not b_xpath or not b_start or not b_end then
+        return false
+    end
+    if a_xpath ~= b_xpath then
+        return false
+    end
+    -- Check for character offset intersection
+    return not (a_end < b_start or b_end < a_start)
+end
+
 function M.sync_callback(self, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
@@ -97,39 +121,40 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     for k, v in pairs(cached_map) do
         merged[k] = v
     end
-    for k, v in pairs(income_map) do
-        if merged[k] then
-            if annotation_changed(merged[k], v) then
-                merged[k].updated_at = os.time()
-                for key, value in pairs(v) do
-                    merged[k][key] = value
+    -- Helper to resolve intersecting highlights by updated_at
+    local function resolve_intersections(map, new_ann)
+        for key, ann in pairs(map) do
+            if positions_intersect(ann, new_ann) then
+                if (ann.updated_at or 0) < (new_ann.updated_at or 0) then
+                    map[key] = nil -- Remove older
+                else
+                    return false -- Do not add new_ann if older
                 end
             end
-        else
-            if not v.created_at then
-                v.created_at = os.time()
-            end
-            if not v.updated_at then
-                v.updated_at = v.created_at
-            end
+        end
+        return true -- Safe to add new_ann
+    end
+    -- Merge income_map
+    for k, v in pairs(income_map) do
+        if not v.created_at then
+            v.created_at = os.time()
+        end
+        if not v.updated_at then
+            v.updated_at = v.created_at
+        end
+        if resolve_intersections(merged, v) then
             merged[k] = v
         end
     end
+    -- Merge local_map
     for k, v in pairs(local_map) do
-        if merged[k] then
-            if annotation_changed(merged[k], v) then
-                merged[k].updated_at = os.time()
-                for key, value in pairs(v) do
-                    merged[k][key] = value
-                end
-            end
-        else
-            if not v.created_at then
-                v.created_at = os.time()
-            end
-            if not v.updated_at then
-                v.updated_at = v.created_at
-            end
+        if not v.created_at then
+            v.created_at = os.time()
+        end
+        if not v.updated_at then
+            v.updated_at = v.created_at
+        end
+        if resolve_intersections(merged, v) then
             merged[k] = v
         end
     end
