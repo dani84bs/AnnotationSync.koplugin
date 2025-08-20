@@ -7,6 +7,7 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
 local util = require("util")
+local lfs = require("libs/libkoreader-lfs")
 
 local annotations = require("annotations")
 
@@ -42,6 +43,21 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
     }
 end
 
+function AnnotationSyncPlugin:onAnnotationsModified(event)
+    UIManager:nextTick(function()
+        local document = self.ui and self.ui.document or nil
+        if not document or not document.file then
+            return
+        end
+        local sdr_dir = docsettings:getSidecarDir(document.file)
+        if not sdr_dir or sdr_dir == "" then
+            return
+        end
+        local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
+        annotations.write_annotations_json(document, stored_annotations, sdr_dir)
+    end)
+end
+
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
     remote.save_server_settings(server)
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
@@ -59,7 +75,11 @@ function AnnotationSyncPlugin:manualSync()
         return
     end
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local json_path = annotations.write_annotations_json(document, stored_annotations, sdr_dir)
+    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+    local json_path = sdr_dir .. "/" .. annotation_filename
+    if not lfs.attributes(json_path, "mode") then
+        annotations.write_annotations_json(document, stored_annotations, sdr_dir)
+    end
     remote.sync_annotations(self, json_path)
 end
 
