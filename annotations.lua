@@ -1,6 +1,27 @@
 local docsettings = require("frontend/docsettings")
 local utils = require("utils")
+local util = require("util")
+local json = require("json")
+
 local M = {}
+
+function M.write_annotations_json(document, stored_annotations, sdr_dir)
+    if not document or not sdr_dir then
+        return false
+    end
+    local file = document.file
+    local hash = file and type(file) == "string" and util.partialMD5(file) or "no_hash"
+    local annotation_map = M.build_annotation_map(stored_annotations)
+    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+    local json_path = sdr_dir .. "/" .. annotation_filename
+    local f = io.open(json_path, "w")
+    if f then
+        f:write(json.encode(annotation_map))
+        f:close()
+        return json_path
+    end
+    return false
+end
 
 function M.annotation_map_to_list(map)
     local list = {}

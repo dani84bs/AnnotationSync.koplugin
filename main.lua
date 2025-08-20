@@ -70,19 +70,12 @@ function AnnotationSyncPlugin:manualSync()
     local file = document and document.file or _("No file open")
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
     flushDocumentMetadata(document)
-    local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local annotation_map = build_annotation_map(stored_annotations)
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
         return
     end
-    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
-    local json_path = sdr_dir .. "/" .. annotation_filename
-    local f = io.open(json_path, "w")
-    if f then
-        f:write(json.encode(annotation_map))
-        f:close()
-    end
+    local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
+    local json_path = annotation_helpers.write_annotations_json(document, stored_annotations, sdr_dir)
     local server_json = G_reader_settings:readSetting("cloud_server_object")
     if server_json and server_json ~= "" then
         local server = json.decode(server_json)
