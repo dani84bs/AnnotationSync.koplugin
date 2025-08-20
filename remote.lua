@@ -3,9 +3,25 @@ local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
 local T = require("ffi/util").template
+local SyncService = require("apps/cloudstorage/syncservice")
+local annotation_helpers = require("annotations")
 
 local M = {}
 
+function M.sync_annotations(self, json_path)
+    local server_json = G_reader_settings:readSetting("cloud_server_object")
+    if server_json and server_json ~= "" then
+        local server = json.decode(server_json)
+        SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
+            return annotation_helpers.sync_callback(self, local_file, cached_file, income_file)
+        end, false)
+    else
+        UIManager:show(InfoMessage:new{
+            text = T(_("No cloud destination set in settings.")),
+            timeout = 4
+        })
+    end
+end
 function M.save_server_settings(server)
     G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
     G_reader_settings:saveSetting("cloud_download_dir", server.url)

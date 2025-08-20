@@ -13,7 +13,6 @@ local util = require("util")
 local annotation_helpers = require("annotations")
 local flushDocumentMetadata = annotation_helpers.flushDocumentMetadata
 local build_annotation_map = annotation_helpers.build_annotation_map
-local sync_callback = annotation_helpers.sync_callback
 
 local safe_json_read = utils.safe_json_read
 
@@ -67,18 +66,7 @@ function AnnotationSyncPlugin:manualSync()
     end
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
     local json_path = annotation_helpers.write_annotations_json(document, stored_annotations, sdr_dir)
-    local server_json = G_reader_settings:readSetting("cloud_server_object")
-    if server_json and server_json ~= "" then
-        local server = json.decode(server_json)
-        SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
-            return sync_callback(self, local_file, cached_file, income_file)
-        end, false)
-    else
-        UIManager:show(InfoMessage:new{
-            text = T(_("No cloud destination set in settings.")),
-            timeout = 4
-        })
-    end
+    remote.sync_annotations(self, json_path)
 end
 
 return AnnotationSyncPlugin
