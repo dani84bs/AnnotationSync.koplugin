@@ -38,7 +38,6 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                                                      self.ui.doc_settings.data.annotations or nil
                 local annotation_annotations = self.ui.annotation and self.ui.annotation.annotations or nil
                 local in_memory = getInMemoryAnnotations(self.ui.document)
-                local plugin = self
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
                     G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
@@ -53,8 +52,8 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                         timeout = 4
                     })
                     UIManager:close()
-                    if plugin and plugin.ui and plugin.ui.menu and plugin.ui.menu.showMainMenu then
-                        plugin.ui.menu:showMainMenu()
+                    if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
+                        self.ui.menu:showMainMenu()
                     end
                 end
                 UIManager:show(sync_service)
