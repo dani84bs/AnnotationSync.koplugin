@@ -1,75 +1,30 @@
-local function getInMemoryAnnotations(document)
-    local json = require("json")
-    local candidates = {"highlights", "annotations", "notes", "info", "_document"}
-    local found = {}
-    if document then
-        for _, key in ipairs(candidates) do
-            local value = document[key]
-            if value ~= nil then
-                found[key] = value
-            end
-        end
-    end
-    return found
-end
-local function flushDocumentMetadata(document)
-    local docsettings = require("frontend/docsettings")
-    if document and document.file then
-        local ds = docsettings:open(document.file)
-        if ds and type(ds.flush) == "function" then
-            pcall(function()
-                ds:flush()
-            end)
-        end
-    end
-end
-local function getBookAnnotations(document)
-    if document and type(document.getAnnotations) == "function" then
-        local ok, result = pcall(function()
-            return document:getAnnotations()
-        end)
-        if ok and type(result) == "table" then
-            return result
-        end
-    end
-    return {}
-end
-local function readCloudJson(dir, hash)
-    local json_path = dir .. "/" .. hash .. ".json"
-    local lfs = require("libs/libkoreader-lfs")
-    local json = require("json")
-    if lfs.attributes(json_path, "mode") == "file" then
-        local f = io.open(json_path, "r")
-        if f then
-            local content = f:read("*a")
-            f:close()
-            local ok, data = pcall(json.decode, content)
-            if ok and type(data) == "table" then
-                return data
-            end
-        end
-    end
-    return {}
-end
+local json = require("json")
+local utils = require("utils")
+local docsettings = require("frontend/docsettings")
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local _ = require("gettext")
 local T = require("ffi/util").template
+local SyncService = require("apps/cloudstorage/syncservice")
+local util = require("util")
+
+local annotation_helpers = require("annotations")
+local getInMemoryAnnotations = annotation_helpers.getInMemoryAnnotations
+local flushDocumentMetadata = annotation_helpers.flushDocumentMetadata
+local getBookAnnotations = annotation_helpers.getBookAnnotations
+local build_annotation_map = annotation_helpers.build_annotation_map
+local sync_callback = annotation_helpers.sync_callback
+
+local safe_json_read = utils.safe_json_read
 
 local AnnotationSyncPlugin = WidgetContainer:extend{
     name = "AnnotationSync"
 }
 
-local filemanager_order = require("ui/elements/filemanager_menu_order")
-local reader_order = require("ui/elements/reader_menu_order")
-
-local utils = require("utils")
-utils.insert_after_statistics(filemanager_order, "annotation_sync_plugin")
-utils.insert_after_statistics(reader_order, "annotation_sync_plugin")
-
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
+    utils.insert_after_statistics("annotation_sync_plugin")
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
@@ -79,26 +34,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
         sub_item_table = {{
             text = _("Settings"),
             callback = function()
-                -- ...existing code...
-                local doc_settings_annotations = nil
-                if self and self.ui and self.ui.doc_settings and self.ui.doc_settings.data and
-                    self.ui.doc_settings.data.annotations then
-                    doc_settings_annotations = self.ui.doc_settings.data.annotations
-                end
-                local doc_settings_annotations_str = require("json").encode(doc_settings_annotations)
-                local annotation_annotations = nil
-                if self and self.ui and self.ui.annotation and self.ui.annotation.annotations then
-                    annotation_annotations = self.ui.annotation.annotations
-                end
-                local annotation_annotations_str = require("json").encode(annotation_annotations)
-                local in_memory = getInMemoryAnnotations(document)
-                local in_memory_str = require("json").encode(in_memory)
+                local doc_settings_annotations = self.ui.doc_settings and self.ui.doc_settings.data and
+                                                     self.ui.doc_settings.data.annotations or nil
+                local annotation_annotations = self.ui.annotation and self.ui.annotation.annotations or nil
+                local in_memory = getInMemoryAnnotations(self.ui.document)
                 local plugin = self
-                local SyncService = require("apps/cloudstorage/syncservice")
                 local sync_service = SyncService:new{}
                 sync_service.onConfirm = function(server)
-                    -- Save the full server object to settings for later sync/upload
-                    G_reader_settings:saveSetting("cloud_server_object", require("json").encode(server))
+                    G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
                     G_reader_settings:saveSetting("cloud_download_dir", server.url)
                     if server.type then
                         G_reader_settings:saveSetting("cloud_provider_type", server.type)
@@ -120,107 +63,27 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             text = _("Manual Sync"),
             enabled = (G_reader_settings:readSetting("cloud_download_dir") or "") ~= "",
             callback = function()
-                local document = self and self.ui and self.ui.document
+                local document = self.ui and self.ui.document or nil
                 local file = document and document.file or _("No file open")
-                local hash = file and type(file) == "string" and require("util").partialMD5(file) or _("No hash")
+                local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
                 flushDocumentMetadata(document)
-                local msg
-                local data = {}
-                local book_annotations = getBookAnnotations(document)
-                local annotation_type = "nil"
-                local annotation_len = 0
-                local annotation_dump = "nil"
-                local annotations = nil
-                local stored_annotations = {}
-                if self and self.ui and self.ui.annotation and self.ui.annotation.annotations then
-                    annotations = self.ui.annotation.annotations
-                    if type(annotations) == "table" then
-                        stored_annotations = annotations
-                    end
-                end
-                -- Build annotation map from current annotations
-                local annotation_map = utils.build_annotation_map(stored_annotations)
-                local docsettings = require("frontend/docsettings")
+                local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
+                local annotation_map = build_annotation_map(stored_annotations)
                 local sdr_dir = docsettings:getSidecarDir(file)
                 if sdr_dir and sdr_dir ~= "" then
                     local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
                     local json_path = sdr_dir .. "/" .. annotation_filename
-                    -- Save only local annotations for now; merge will happen in sync callback
                     local f = io.open(json_path, "w")
                     if f then
-                        f:write(require("json").encode(annotation_map))
+                        f:write(json.encode(annotation_map))
                         f:close()
                     end
-                    -- Upload and merge in sync callback
                     local server_json = G_reader_settings:readSetting("cloud_server_object")
                     if server_json and server_json ~= "" then
-                        local server = require("json").decode(server_json)
-                        local SyncService = require("apps/cloudstorage/syncservice")
-                        local utils = require("utils")
-                        local json = require("json")
-                        local sync_cb = function(local_file, cached_file, income_file)
-                            -- Read all three files, handle missing gracefully
-                            local function read_json(path)
-                                local f = io.open(path, "r")
-                                if not f then
-                                    return {}
-                                end
-                                local content = f:read("*a")
-                                f:close()
-                                if not content or content == "" then
-                                    return {}
-                                end
-                                local ok, data = pcall(json.decode, content)
-                                if ok and type(data) == "table" then
-                                    -- If this is a Dropbox error object, treat as empty
-                                    if data.error_summary or (data.error and type(data.error) == "table") then
-                                        return {}
-                                    end
-                                    return data
-                                end
-                                return {}
-                            end
-                            local local_map = read_json(local_file)
-                            local cached_map = read_json(cached_file)
-                            local income_map = read_json(income_file)
-                            -- If income_map or cached_map are missing, treat as empty
-                            if type(local_map) ~= "table" then
-                                local_map = {}
-                            end
-                            if type(cached_map) ~= "table" then
-                                cached_map = {}
-                            end
-                            if type(income_map) ~= "table" then
-                                income_map = {}
-                            end
-                            -- Merge logic: local wins, then income, then cached
-                            local merged = {}
-                            for k, v in pairs(cached_map) do
-                                merged[k] = v
-                            end
-                            for k, v in pairs(income_map) do
-                                merged[k] = v
-                            end
-                            for k, v in pairs(local_map) do
-                                merged[k] = v
-                            end
-                            -- Convert merged map to list and apply to current book, save, then reload
-                            if self and self.ui and self.ui.annotation then
-                                local utils = require("utils")
-                                local merged_list = utils.annotation_map_to_list(merged)
-                                self.ui.annotation.annotations = merged_list
-                                self.ui.annotation:onSaveSettings()
-                                self.ui:reloadDocument()
-                            end
-                            -- Save merged result to local_file
-                            local f = io.open(local_file, "w")
-                            if f then
-                                f:write(json.encode(merged))
-                                f:close()
-                            end
-                            return true
-                        end
-                        SyncService.sync(server, json_path, sync_cb, false)
+                        local server = json.decode(server_json)
+                        SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
+                            return sync_callback(self, local_file, cached_file, income_file)
+                        end, false)
                     else
                         UIManager:show(InfoMessage:new{
                             text = T(_("No cloud destination set in settings.")),
@@ -234,4 +97,3 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
 end
 
 return AnnotationSyncPlugin
-

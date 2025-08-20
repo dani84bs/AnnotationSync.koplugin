@@ -1,41 +1,35 @@
+local reader_order = require("ui/elements/reader_menu_order")
 local M = {}
 
-function M.annotation_map_to_list(map)
-    local list = {}
-    if type(map) == "table" then
-        for _, ann in pairs(map) do
-            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" then
-                table.insert(list, ann)
-            end
-        end
+function M.safe_json_read(path)
+    local f = io.open(path, "r")
+    if not f then
+        return {}
     end
-    return list
+    local content = f:read("*a")
+    f:close()
+    if not content or content == "" then
+        return {}
+    end
+    local ok, data = pcall(json.decode, content)
+    if ok and type(data) == "table" then
+        if data.error_summary or (data.error and type(data.error) == "table") then
+            return {}
+        end
+        return data
+    end
+    return {}
 end
 
-function M.insert_after_statistics(order_table, key)
+function M.insert_after_statistics(key)
     local pos = 1
-    for index, value in ipairs(order_table.tools) do
+    for index, value in ipairs(reader_order.tools) do
         if value == "statistics" then
             pos = index + 1
             break
         end
     end
-    table.insert(order_table.tools, pos, key)
-end
-
-function M.annotation_key(annotation)
-    return annotation.pos0 .. "|" .. annotation.pos1
-end
-
-function M.build_annotation_map(annotations)
-    local map = {}
-    if type(annotations) == "table" then
-        for _, ann in ipairs(annotations) do
-            local key = M.annotation_key(ann)
-            map[key] = ann
-        end
-    end
-    return map
+    table.insert(reader_order.tools, pos, key)
 end
 
 return M
