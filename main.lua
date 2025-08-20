@@ -10,9 +10,9 @@ local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
 local util = require("util")
 
-local annotation_helpers = require("annotations")
-local flushDocumentMetadata = annotation_helpers.flushDocumentMetadata
-local build_annotation_map = annotation_helpers.build_annotation_map
+local annotations = require("annotations")
+local flushDocumentMetadata = annotations.flushDocumentMetadata
+local build_annotation_map = annotations.build_annotation_map
 
 local safe_json_read = utils.safe_json_read
 
@@ -65,7 +65,7 @@ function AnnotationSyncPlugin:manualSync()
         return
     end
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local json_path = annotation_helpers.write_annotations_json(document, stored_annotations, sdr_dir)
+    local json_path = annotations.write_annotations_json(document, stored_annotations, sdr_dir)
     remote.sync_annotations(self, json_path)
 end
 
