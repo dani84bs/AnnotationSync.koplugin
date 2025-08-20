@@ -1,4 +1,5 @@
 local json = require("json")
+local remote = require("remote")
 local utils = require("utils")
 local docsettings = require("frontend/docsettings")
 local InfoMessage = require("ui/widget/infomessage")
@@ -49,17 +50,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
 end
 
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
-    G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
-    G_reader_settings:saveSetting("cloud_download_dir", server.url)
-    if server.type then
-        G_reader_settings:saveSetting("cloud_provider_type", server.type)
-    end
-    UIManager:show(InfoMessage:new{
-        text = T(_("Cloud destination set to:\n%1\nProvider: %2\nPlease restart KOReader for changes to take effect."),
-            server.url, server.type or "unknown"),
-        timeout = 4
-    })
-    UIManager:close()
+    remote.save_server_settings(server)
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
         self.ui.menu:showMainMenu()
     end
