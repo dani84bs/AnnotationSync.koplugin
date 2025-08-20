@@ -112,10 +112,35 @@ local function positions_intersect(a, b)
     return not (a_end < b_start or b_end < a_start)
 end
 
+-- Returns a list of annotations that are present in cached_map but missing from local_map (i.e., deleted locally)
+function M.get_deleted_annotations(local_map, cached_map)
+    local deleted = {}
+    if type(cached_map) == "table" and type(local_map) == "table" then
+        for cached_k, cached_v in pairs(cached_map) do
+            local found = false
+            for local_k, local_v in pairs(local_map) do
+                if positions_intersect(cached_v, local_v) then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                cached_v.deleted = true
+                cached_v.updated_at = os.time()
+                local_map[cached_k] = cached_v
+                table.insert(deleted, cached_v)
+            end
+        end
+    end
+    return deleted
+end
+
 function M.sync_callback(self, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
     local income_map = utils.read_json(income_file)
+    -- Mark deleted annotations in local_map
+    M.get_deleted_annotations(local_map, cached_map)
     -- Merge logic: local wins, then income, then cached
     local merged = {}
     for k, v in pairs(cached_map) do
