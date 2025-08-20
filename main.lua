@@ -73,26 +73,27 @@ function AnnotationSyncPlugin:manualSync()
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
     local annotation_map = build_annotation_map(stored_annotations)
     local sdr_dir = docsettings:getSidecarDir(file)
-    if sdr_dir and sdr_dir ~= "" then
-        local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
-        local json_path = sdr_dir .. "/" .. annotation_filename
-        local f = io.open(json_path, "w")
-        if f then
-            f:write(json.encode(annotation_map))
-            f:close()
-        end
-        local server_json = G_reader_settings:readSetting("cloud_server_object")
-        if server_json and server_json ~= "" then
-            local server = json.decode(server_json)
-            SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
-                return sync_callback(self, local_file, cached_file, income_file)
-            end, false)
-        else
-            UIManager:show(InfoMessage:new{
-                text = T(_("No cloud destination set in settings.")),
-                timeout = 4
-            })
-        end
+    if not sdr_dir or sdr_dir == "" then
+        return
+    end
+    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+    local json_path = sdr_dir .. "/" .. annotation_filename
+    local f = io.open(json_path, "w")
+    if f then
+        f:write(json.encode(annotation_map))
+        f:close()
+    end
+    local server_json = G_reader_settings:readSetting("cloud_server_object")
+    if server_json and server_json ~= "" then
+        local server = json.decode(server_json)
+        SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
+            return sync_callback(self, local_file, cached_file, income_file)
+        end, false)
+    else
+        UIManager:show(InfoMessage:new{
+            text = T(_("No cloud destination set in settings.")),
+            timeout = 4
+        })
     end
 end
 
