@@ -1,7 +1,7 @@
 local reader_order = require("ui/elements/reader_menu_order")
 local M = {}
 
-function M.safe_json_read(path)
+function M.read_json(path)
     local f = io.open(path, "r")
     if not f then
         return {}

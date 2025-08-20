@@ -50,7 +50,7 @@ function M.build_annotation_map(annotations)
     return map
 end
 
-function M.getInMemoryAnnotations(document)
+function M.get_in_memory_annotations(document)
     local candidates = {"highlights", "annotations", "notes", "info", "_document"}
     local found = {}
     if document then
@@ -64,7 +64,7 @@ function M.getInMemoryAnnotations(document)
     return found
 end
 
-function M.flushDocumentMetadata(document)
+function M.flush_metadata(document)
     if document and document.file then
         local ds = docsettings:open(document.file)
         if ds and type(ds.flush) == "function" then
@@ -75,7 +75,7 @@ function M.flushDocumentMetadata(document)
     end
 end
 
-function M.getBookAnnotations(document)
+function M.get_book_annotations(document)
     if document and type(document.getAnnotations) == "function" then
         local ok, result = pcall(function()
             return document:getAnnotations()
@@ -88,9 +88,9 @@ function M.getBookAnnotations(document)
 end
 
 function M.sync_callback(self, local_file, cached_file, income_file)
-    local local_map = utils.safe_json_read(local_file)
-    local cached_map = utils.safe_json_read(cached_file)
-    local income_map = utils.safe_json_read(income_file)
+    local local_map = utils.read_json(local_file)
+    local cached_map = utils.read_json(cached_file)
+    local income_map = utils.read_json(income_file)
     -- Merge logic: local wins, then income, then cached
     local merged = {}
     for k, v in pairs(cached_map) do

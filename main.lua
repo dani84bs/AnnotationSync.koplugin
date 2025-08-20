@@ -1,8 +1,6 @@
-local json = require("json")
 local remote = require("remote")
 local utils = require("utils")
 local docsettings = require("frontend/docsettings")
-local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local _ = require("gettext")
@@ -11,10 +9,6 @@ local SyncService = require("apps/cloudstorage/syncservice")
 local util = require("util")
 
 local annotations = require("annotations")
-local flushDocumentMetadata = annotations.flushDocumentMetadata
-local build_annotation_map = annotations.build_annotation_map
-
-local safe_json_read = utils.safe_json_read
 
 local AnnotationSyncPlugin = WidgetContainer:extend{
     name = "AnnotationSync"
@@ -59,7 +53,7 @@ function AnnotationSyncPlugin:manualSync()
     local document = self.ui and self.ui.document or nil
     local file = document and document.file or _("No file open")
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
-    flushDocumentMetadata(document)
+    annotations.flush_metadata(document)
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
         return
