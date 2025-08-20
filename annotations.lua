@@ -27,7 +27,7 @@ function M.map_to_list(map)
     local list = {}
     if type(map) == "table" then
         for _, ann in pairs(map) do
-            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" then
+            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" and not ann.deleted then
                 table.insert(list, ann)
             end
         end
