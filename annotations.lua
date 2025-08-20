@@ -44,6 +44,12 @@ function M.list_to_map(annotations)
     if type(annotations) == "table" then
         for _, ann in ipairs(annotations) do
             local key = M.annotation_key(ann)
+            -- Add created_at and updated_at if missing
+            local now = os.time()
+            if not ann.created_at then
+                ann.created_at = now
+            end
+            ann.updated_at = now
             map[key] = ann
         end
     end
@@ -70,11 +76,63 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     for k, v in pairs(cached_map) do
         merged[k] = v
     end
+    local function annotation_changed(a, b)
+        if not a or not b then
+            return true
+        end
+        for key, value in pairs(a) do
+            if key ~= "created_at" and key ~= "updated_at" then
+                if b[key] ~= value then
+                    return true
+                end
+            end
+        end
+        for key, value in pairs(b) do
+            if key ~= "created_at" and key ~= "updated_at" then
+                if a[key] ~= value then
+                    return true
+                end
+            end
+        end
+        return false
+    end
     for k, v in pairs(income_map) do
-        merged[k] = v
+        if merged[k] then
+            if annotation_changed(merged[k], v) then
+                merged[k].updated_at = os.time()
+                for key, value in pairs(v) do
+                    merged[k][key] = value
+                end
+            end
+        else
+            -- Preserve original timestamps if present
+            if not v.created_at then
+                v.created_at = os.time()
+            end
+            if not v.updated_at then
+                v.updated_at = v.created_at
+            end
+            merged[k] = v
+        end
     end
     for k, v in pairs(local_map) do
-        merged[k] = v
+        if merged[k] then
+            if annotation_changed(merged[k], v) then
+                merged[k].updated_at = os.time()
+                for key, value in pairs(v) do
+                    merged[k][key] = value
+                end
+            end
+        else
+            -- Preserve original timestamps if present
+            if not v.created_at then
+                v.created_at = os.time()
+            end
+            if not v.updated_at then
+                v.updated_at = v.created_at
+            end
+            merged[k] = v
+        end
     end
 
     if self and self.ui and self.ui.annotation then
