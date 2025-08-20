@@ -67,6 +67,27 @@ function M.flush_metadata(document)
     end
 end
 
+local function annotation_changed(a, b)
+    if not a or not b then
+        return true
+    end
+    for key, value in pairs(a) do
+        if key ~= "created_at" and key ~= "updated_at" then
+            if b[key] ~= value then
+                return true
+            end
+        end
+    end
+    for key, value in pairs(b) do
+        if key ~= "created_at" and key ~= "updated_at" then
+            if a[key] ~= value then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function M.sync_callback(self, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
@@ -75,26 +96,6 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     local merged = {}
     for k, v in pairs(cached_map) do
         merged[k] = v
-    end
-    local function annotation_changed(a, b)
-        if not a or not b then
-            return true
-        end
-        for key, value in pairs(a) do
-            if key ~= "created_at" and key ~= "updated_at" then
-                if b[key] ~= value then
-                    return true
-                end
-            end
-        end
-        for key, value in pairs(b) do
-            if key ~= "created_at" and key ~= "updated_at" then
-                if a[key] ~= value then
-                    return true
-                end
-            end
-        end
-        return false
     end
     for k, v in pairs(income_map) do
         if merged[k] then
@@ -105,7 +106,6 @@ function M.sync_callback(self, local_file, cached_file, income_file)
                 end
             end
         else
-            -- Preserve original timestamps if present
             if not v.created_at then
                 v.created_at = os.time()
             end
@@ -124,7 +124,6 @@ function M.sync_callback(self, local_file, cached_file, income_file)
                 end
             end
         else
-            -- Preserve original timestamps if present
             if not v.created_at then
                 v.created_at = os.time()
             end
