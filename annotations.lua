@@ -12,7 +12,7 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir)
     local file = document.file
     local hash = file and type(file) == "string" and util.partialMD5(file) or "no_hash"
     local annotation_map = M.list_to_map(stored_annotations)
-    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+    local annotation_filename = hash .. ".json"
     local json_path = sdr_dir .. "/" .. annotation_filename
     local f = io.open(json_path, "w")
     if f then

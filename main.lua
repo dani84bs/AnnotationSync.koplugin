@@ -1,15 +1,15 @@
-local remote = require("remote")
-local utils = require("utils")
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
-local _ = require("gettext")
 local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
+local _ = require("gettext")
 
 local annotations = require("annotations")
+local remote = require("remote")
+local utils = require("utils")
 
 local AnnotationSyncPlugin = WidgetContainer:extend{
     name = "AnnotationSync"
@@ -75,7 +75,7 @@ function AnnotationSyncPlugin:manualSync()
         return
     end
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local annotation_filename = (document and document.annotation_file) or (hash .. ".json")
+    local annotation_filename = hash .. ".json"
     local json_path = sdr_dir .. "/" .. annotation_filename
     if not lfs.attributes(json_path, "mode") then
         annotations.write_annotations_json(document, stored_annotations, sdr_dir)
