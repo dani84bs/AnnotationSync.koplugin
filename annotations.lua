@@ -35,18 +35,6 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir)
     return false
 end
 
-function M.map_to_list(map)
-    local list = {}
-    if type(map) == "table" then
-        for _, ann in pairs(map) do
-            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" and not ann.deleted then
-                table.insert(list, ann)
-            end
-        end
-    end
-    return list
-end
-
 function M.annotation_key(annotation)
     return annotation.pos0 .. "|" .. annotation.pos1
 end
@@ -62,25 +50,16 @@ function M.list_to_map(annotations)
     return map
 end
 
-local function annotation_changed(a, b)
-    if not a or not b then
-        return true
-    end
-    for key, value in pairs(a) do
-        if key ~= "datetime" and key ~= "datetime_updated" then
-            if b[key] ~= value then
-                return true
+function M.map_to_list(map)
+    local list = {}
+    if type(map) == "table" then
+        for _, ann in pairs(map) do
+            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" and not ann.deleted then
+                table.insert(list, ann)
             end
         end
     end
-    for key, value in pairs(b) do
-        if key ~= "datetime" and key ~= "datetime_updated" then
-            if a[key] ~= value then
-                return true
-            end
-        end
-    end
-    return false
+    return list
 end
 
 -- Returns true if two highlights intersect (XPath and character offsets)

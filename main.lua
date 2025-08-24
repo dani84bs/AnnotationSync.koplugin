@@ -62,6 +62,8 @@ function AnnotationSyncPlugin:manualSync()
     local annotation_filename = hash .. ".json"
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir)
+    remote.sync_annotations(self, json_path)
+
 end
 
 return AnnotationSyncPlugin
