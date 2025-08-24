@@ -5,10 +5,22 @@ local json = require("json")
 
 local M = {}
 
+function M.flush_metadata(document)
+    if document and document.file then
+        local ds = docsettings:open(document.file)
+        if ds and type(ds.flush) == "function" then
+            pcall(function()
+                ds:flush()
+            end)
+        end
+    end
+end
+
 function M.write_annotations_json(document, stored_annotations, sdr_dir)
     if not document or not sdr_dir then
         return false
     end
+    M.flush_metadata(document)
     local file = document.file
     local hash = file and type(file) == "string" and util.partialMD5(file) or "no_hash"
     local annotation_map = M.list_to_map(stored_annotations)
@@ -44,27 +56,10 @@ function M.list_to_map(annotations)
     if type(annotations) == "table" then
         for _, ann in ipairs(annotations) do
             local key = M.annotation_key(ann)
-            -- Add created_at and updated_at if missing
-            local now = os.time()
-            if not ann.created_at then
-                ann.created_at = now
-            end
-            ann.updated_at = now
             map[key] = ann
         end
     end
     return map
-end
-
-function M.flush_metadata(document)
-    if document and document.file then
-        local ds = docsettings:open(document.file)
-        if ds and type(ds.flush) == "function" then
-            pcall(function()
-                ds:flush()
-            end)
-        end
-    end
 end
 
 local function annotation_changed(a, b)
@@ -72,14 +67,14 @@ local function annotation_changed(a, b)
         return true
     end
     for key, value in pairs(a) do
-        if key ~= "created_at" and key ~= "updated_at" then
+        if key ~= "datetime" and key ~= "datetime_updated" then
             if b[key] ~= value then
                 return true
             end
         end
     end
     for key, value in pairs(b) do
-        if key ~= "created_at" and key ~= "updated_at" then
+        if key ~= "datetime" and key ~= "datetime_updated" then
             if a[key] ~= value then
                 return true
             end
@@ -126,7 +121,6 @@ function M.get_deleted_annotations(local_map, cached_map)
             end
             if not found then
                 cached_v.deleted = true
-                cached_v.updated_at = os.time()
                 local_map[cached_k] = cached_v
                 table.insert(deleted, cached_v)
             end
@@ -146,11 +140,13 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     for k, v in pairs(cached_map) do
         merged[k] = v
     end
-    -- Helper to resolve intersecting highlights by updated_at
+    -- Helper to resolve intersecting highlights by datetime_updated
     local function resolve_intersections(map, new_ann)
         for key, ann in pairs(map) do
             if positions_intersect(ann, new_ann) then
-                if (ann.updated_at or 0) < (new_ann.updated_at or 0) then
+                local ann_time = ann.datetime_updated or ann.datetime or 0
+                local new_time = new_ann.datetime_updated or new_ann.datetime or 0
+                if ann_time < new_time then
                     map[key] = nil -- Remove older
                 else
                     return false -- Do not add new_ann if older
@@ -161,24 +157,12 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     end
     -- Merge income_map
     for k, v in pairs(income_map) do
-        if not v.created_at then
-            v.created_at = os.time()
-        end
-        if not v.updated_at then
-            v.updated_at = v.created_at
-        end
         if resolve_intersections(merged, v) then
             merged[k] = v
         end
     end
     -- Merge local_map
     for k, v in pairs(local_map) do
-        if not v.created_at then
-            v.created_at = os.time()
-        end
-        if not v.updated_at then
-            v.updated_at = v.created_at
-        end
         if resolve_intersections(merged, v) then
             merged[k] = v
         end

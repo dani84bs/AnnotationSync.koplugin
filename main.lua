@@ -43,21 +43,6 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
     }
 end
 
-function AnnotationSyncPlugin:onAnnotationsModified(event)
-    UIManager:nextTick(function()
-        local document = self.ui and self.ui.document or nil
-        if not document or not document.file then
-            return
-        end
-        local sdr_dir = docsettings:getSidecarDir(document.file)
-        if not sdr_dir or sdr_dir == "" then
-            return
-        end
-        local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-        annotations.write_annotations_json(document, stored_annotations, sdr_dir)
-    end)
-end
-
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
     remote.save_server_settings(server)
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
@@ -69,7 +54,6 @@ function AnnotationSyncPlugin:manualSync()
     local document = self.ui and self.ui.document or nil
     local file = document and document.file or _("No file open")
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
-    annotations.flush_metadata(document)
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
         return
@@ -77,10 +61,7 @@ function AnnotationSyncPlugin:manualSync()
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
     local annotation_filename = hash .. ".json"
     local json_path = sdr_dir .. "/" .. annotation_filename
-    if not lfs.attributes(json_path, "mode") then
-        annotations.write_annotations_json(document, stored_annotations, sdr_dir)
-    end
-    remote.sync_annotations(self, json_path)
+    annotations.write_annotations_json(document, stored_annotations, sdr_dir)
 end
 
 return AnnotationSyncPlugin
