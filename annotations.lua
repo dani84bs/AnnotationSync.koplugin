@@ -5,12 +5,17 @@ local json = require("json")
 
 local M = {}
 
-function M.flush_metadata(document)
+function M.flush_metadata(document, stored_annotations)
     if document and document.file then
         local ds = docsettings:open(document.file)
         if ds and type(ds.flush) == "function" then
             pcall(function()
                 ds:flush()
+            end)
+        end
+        if ds and type(ds.close) == "function" then
+            pcall(function()
+                ds:close()
             end)
         end
     end
@@ -20,7 +25,7 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir)
     if not document or not sdr_dir then
         return false
     end
-    M.flush_metadata(document)
+    M.flush_metadata(document, stored_annotations)
     local file = document.file
     local hash = file and type(file) == "string" and util.partialMD5(file) or "no_hash"
     local annotation_map = M.list_to_map(stored_annotations)
