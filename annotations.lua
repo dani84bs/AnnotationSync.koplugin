@@ -150,6 +150,9 @@ function M.sync_callback(self, local_file, cached_file, income_file)
 
     if self and self.ui and self.ui.annotation then
         local merged_list = M.map_to_list(merged)
+        table.sort(merged_list, function(a, b)
+            return (a.datetime_updated or a.datetime or 0) < (b.datetime_updated or b.datetime or 0)
+        end)
         self.ui.annotation.annotations = merged_list
         self.ui.annotation:onSaveSettings()
         self.ui:reloadDocument()
