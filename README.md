@@ -15,20 +15,29 @@
 - **Lightweight, minimal setup—just enable and configure!**
 
 ## 📦 Installation
-1. Copy this folder to your KOReader `plugins` directory.
+1. Copy this folder to your KOReader `plugins` directory (make sure it is named `AnnotationSync.plugin`)
 2. Restart KOReader.
 3. Enable AnnotationSync from the plugins menu.
 
 ## 🛠 Usage
-- Open KOReader and activate AnnotationSync from the plugins menu.
-- Set up your cloud sync destination in Settings.
-- Use "Manual Sync" to sync your annotations anytime.
+- Open KOReader and activate AnnotationSync from the plugins menu:
+  - Tools -> More tools -> Plugin management
+- Choose the cloud storage source in Annotation Sync settings:
+  - Tools -> Annotation Sync -> Settings
+  - Add a cloud storage service, if necessary:
+    - Add service -> +
+    - Supported providers: Dropbox, FTP, WebDAV
+  - Select the desired cloud storage service from the list
+  - Restart KOReader as indicated after selection
+
+- Sync your annotations at any time:
+  - Tools -> Annotation Sync -> Manual Sync
 
 ## 🤝 Contributing
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
 
 ## 📄 Known Issues
-At the moment intersections between higlights spannig different
+At the moment intersections between highlights spanning different
 epub blocks may not be detected.
 
 ---
