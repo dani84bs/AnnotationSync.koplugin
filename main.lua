@@ -53,6 +53,10 @@ end
 function AnnotationSyncPlugin:manualSync()
     local document = self.ui and self.ui.document or nil
     local file = document and document.file or _("No file open")
+    if file == "No file open" then
+        utils.show_msg("A document must be active to sync.")
+        return
+    end
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
