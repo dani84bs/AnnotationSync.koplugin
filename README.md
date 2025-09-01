@@ -15,7 +15,7 @@
 - **Lightweight, minimal setup—just enable and configure!**
 
 ## 📦 Installation
-1. Copy this folder to your KOReader `plugins` directory (make sure it is named `AnnotationSync.plugin`)
+1. Copy this folder to your KOReader `plugins` directory (make sure it is named `AnnotationSync.koplugin`)
 2. Restart KOReader.
 3. Enable AnnotationSync from the plugins menu.
 
