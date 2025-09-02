@@ -1,4 +1,7 @@
 local reader_order = require("ui/elements/reader_menu_order")
+local UIManager = require("ui/uimanager")
+local InfoMessage = require("ui/widget/infomessage")
+
 local M = {}
 
 function M.read_json(path)
@@ -30,6 +33,13 @@ function M.insert_after_statistics(key)
         end
     end
     table.insert(reader_order.tools, pos, key)
+end
+
+function M.show_msg(msg)
+    UIManager:show(InfoMessage:new{
+        text = msg,
+        timeout = 3,
+    })
 end
 
 return M
