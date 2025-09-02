@@ -148,9 +148,8 @@ function M.sync_callback(self, local_file, cached_file, income_file)
 
     if self and self.ui and self.ui.annotation then
         local merged_list = M.map_to_list(merged)
-        -- KOReader requires its annotation `pageno` values to be in ascending numerical order.
         table.sort(merged_list, function(a, b)
-            return (a.pageno or -1) < (b.pageno or 0)
+            return self.ui.document:compareXPointers(a.page, b.page) > 0
         end)
         self.ui.annotation.annotations = merged_list
         self.ui.annotation:onSaveSettings()
