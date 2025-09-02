@@ -67,36 +67,33 @@ function M.map_to_list(map)
     return list
 end
 
--- Returns true if two highlights intersect (XPath and character offsets)
-local function positions_intersect(a, b)
-    if not a or not b or not a.pos0 or not a.pos1 or not b.pos0 or not b.pos1 then
+local function positions_intersect(a, b, document)
+    if not a or not b then
         return false
     end
-    local function parse_xpath_offset(pos)
-        -- Example: /body/DocFragment[2]/body/section/h1/text().0
-        local xpath, offset = string.match(pos, "^(.-)%.(%d+)$")
-        return xpath, tonumber(offset)
-    end
-    local a_xpath, a_start = parse_xpath_offset(a.pos0)
-    local _, a_end = parse_xpath_offset(a.pos1)
-    local b_xpath, b_start = parse_xpath_offset(b.pos0)
-    local _, b_end = parse_xpath_offset(b.pos1)
-    if not a_xpath or not a_start or not a_end or not b_xpath or not b_start or not b_end then
+    if not a.pos0 or not a.pos1 or not b.pos0 or not b.pos1 then
         return false
     end
-    if a_xpath ~= b_xpath then
-        return false
+
+    -- A_Start <= B_Start <= A_End
+    if document:compareXPointers(a.pos0, b.pos0) >= 0 and document:compareXPointers(b.pos0, a.pos1) >= 0 then
+        return true
     end
-    -- Check for character offset intersection
-    return not (a_end < b_start or b_end < a_start)
+
+    -- B_Start <= A_Start <= B_End
+    if document:compareXPointers(b.pos0, a.pos0) >= 0 and document:compareXPointers(a.pos0, b.pos1) >= 0 then
+        return true
+    end
+
+    return false
 end
 
-function M.get_deleted_annotations(local_map, cached_map)
+function M.get_deleted_annotations(local_map, cached_map, document)
     if type(cached_map) == "table" and type(local_map) == "table" then
         for cached_k, cached_v in pairs(cached_map) do
             local found = false
             for local_k, local_v in pairs(local_map) do
-                if positions_intersect(cached_v, local_v) then
+                if positions_intersect(cached_v, local_v, document) then
                     found = true
                     break
                 end
@@ -113,8 +110,9 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
     local income_map = utils.read_json(income_file)
+    local document = self.ui.document
     -- Mark deleted annotations in local_map
-    M.get_deleted_annotations(local_map, cached_map)
+    M.get_deleted_annotations(local_map, cached_map, document)
     -- Merge logic: local wins, then income, then cached
     local merged = {}
     for k, v in pairs(cached_map) do
@@ -123,7 +121,7 @@ function M.sync_callback(self, local_file, cached_file, income_file)
     -- Helper to resolve intersecting highlights by datetime_updated
     local function resolve_intersections(map, new_ann)
         for key, ann in pairs(map) do
-            if positions_intersect(ann, new_ann) then
+            if positions_intersect(ann, new_ann, document) then
                 local ann_time = ann.datetime_updated or ann.datetime or 0
                 local new_time = new_ann.datetime_updated or new_ann.datetime or 0
                 if ann_time < new_time then
