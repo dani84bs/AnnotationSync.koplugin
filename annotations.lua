@@ -40,8 +40,20 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir)
     return false
 end
 
+function M.is_annotation(candidate)
+    return candidate and type(candidate.pos0) == "string" and type(candidate.pos1) == "string"
+end
+
+function M.is_bookmark(candidate)
+    return candidate and type(candidate.page) == "string" and not M.is_annotation(candidate)
+end
+
 function M.annotation_key(annotation)
-    return annotation.pos0 .. "|" .. annotation.pos1
+    if M.is_annotation(annotation) then
+        return annotation.pos0 .. "|" .. annotation.pos1
+    elseif M.is_bookmark(annotation) then
+        return "BOOKMARK|" .. annotation.page
+    end
 end
 
 function M.list_to_map(annotations)
@@ -49,7 +61,9 @@ function M.list_to_map(annotations)
     if type(annotations) == "table" then
         for _, ann in ipairs(annotations) do
             local key = M.annotation_key(ann)
-            map[key] = ann
+            if type(key) == "string" then
+                map[key] = ann
+            end
         end
     end
     return map
@@ -59,8 +73,10 @@ function M.map_to_list(map)
     local list = {}
     if type(map) == "table" then
         for _, ann in pairs(map) do
-            if ann and type(ann.pos0) == "string" and type(ann.pos1) == "string" and not ann.deleted then
-                table.insert(list, ann)
+            if ann and not ann.deleted then
+                if M.is_annotation(ann) or M.is_bookmark(ann) then
+                    table.insert(list, ann)
+                end
             end
         end
     end
@@ -71,6 +87,11 @@ local function positions_intersect(a, b, document)
     if not a or not b then
         return false
     end
+
+    if M.annotation_key(a) == M.annotation_key(b) then
+        return true
+    end
+
     if not a.pos0 or not a.pos1 or not b.pos0 or not b.pos1 then
         return false
     end
