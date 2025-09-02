@@ -53,8 +53,9 @@ filesystem or the contents of the files.
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
 
 ## 📄 Known Issues
-At the moment intersections between highlights spanning different
-epub blocks may not be detected.
+~~At the moment intersections between highlights spanning different
+epub blocks may not be detected.~~ Fixed in [4ae7868](https://github.com/dani84bs/AnnotationSync.koplugin/commit/4ae7868057991f57ab2d7ff865d1201ebfd5e53e)
+
 
 ---
 
