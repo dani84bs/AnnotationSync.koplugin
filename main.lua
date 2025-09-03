@@ -1,5 +1,7 @@
+
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
+local Dispatcher = require("dispatcher")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
@@ -18,6 +20,7 @@ local AnnotationSyncPlugin = WidgetContainer:extend{
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
     utils.insert_after_statistics("annotation_sync_plugin")
+    self:onDispatcherRegisterActions()
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
@@ -43,6 +46,15 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
     }
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncManualSync()
+    self:manualSync()
+    return true
+end
+
+function AnnotationSyncPlugin:onDispatcherRegisterActions()
+    Dispatcher:registerAction("annotation_sync_manual_sync", { category="none", event="AnnotationSyncManualSync", title=_("AnnotationSync: Manual Sync"), text=_("Sync annotations and bookmarks with AnnotationSync."), separator=true, reader=true,})
+end
+
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
     remote.save_server_settings(server)
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
@@ -51,12 +63,13 @@ function AnnotationSyncPlugin:onSyncServiceConfirm(server)
 end
 
 function AnnotationSyncPlugin:manualSync()
-    local document = self.ui and self.ui.document or nil
-    local file = document and document.file or _("No file open")
-    if file == "No file open" then
+    local document = self.ui and self.ui.document
+    local file = document and document.file
+    if not file then
         utils.show_msg("A document must be active to sync.")
         return
     end
+
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
