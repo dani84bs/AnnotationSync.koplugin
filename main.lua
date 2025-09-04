@@ -12,7 +12,8 @@ local remote = require("remote")
 local utils = require("utils")
 
 local AnnotationSyncPlugin = WidgetContainer:extend{
-    name = "AnnotationSync"
+    name = "AnnotationSync",
+    is_doc_only = true
 }
 
 function AnnotationSyncPlugin:init()
