@@ -35,6 +35,10 @@
   - Or bind the "Annotation Sync: Manual Sync" action to a gesture or keyboard shortcut
   - Or add the "Annotation Sync: Manual Sync" action to a profile action list
 
+### 📦 DropBox setup
+Setting up Dropbox on Koreader can be a little bit difficult. 
+[This excellent post on mobileread forum](https://www.mobileread.com/forums/showthread.php?t=353670) explains the procedure in detail.
+
 ## Details
 AnnotationSync stores its files directly in the selected cloud storage
 directory, so you may want to create a new directory dedicated to AnnotationSync.
