@@ -174,7 +174,7 @@ function M.sync_callback(self, local_file, cached_file, income_file)
         end)
         self.ui.annotation.annotations = merged_list
         self.ui.annotation:onSaveSettings()
-        self.ui:reloadDocument()
+        self.ui.document:render()
     end
 
     local f = io.open(local_file, "w")
