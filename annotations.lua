@@ -127,11 +127,11 @@ function M.get_deleted_annotations(local_map, cached_map, document)
     end
 end
 
-function M.sync_callback(self, local_file, cached_file, income_file)
+function M.sync_callback(widget, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
     local income_map = utils.read_json(income_file)
-    local document = self.ui.document
+    local document = widget.ui.document
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, cached_map, document)
     -- Merge logic: local wins, then income, then cached
@@ -167,14 +167,14 @@ function M.sync_callback(self, local_file, cached_file, income_file)
         end
     end
 
-    if self and self.ui and self.ui.annotation then
+    if widget and widget.ui and widget.ui.annotation then
         local merged_list = M.map_to_list(merged)
         table.sort(merged_list, function(a, b)
-            return self.ui.document:compareXPointers(a.page, b.page) > 0
+            return widget.ui.document:compareXPointers(a.page, b.page) > 0
         end)
-        self.ui.annotation.annotations = merged_list
-        self.ui.annotation:onSaveSettings()
-        self.ui.document:render()
+        widget.ui.annotation.annotations = merged_list
+        widget.ui.annotation:onSaveSettings()
+        widget.ui.document:render()
     end
 
     local f = io.open(local_file, "w")

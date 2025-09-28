@@ -9,12 +9,12 @@ local annotations = require("annotations")
 
 local M = {}
 
-function M.sync_annotations(self, json_path)
+function M.sync_annotations(widget, json_path)
     local server_json = G_reader_settings:readSetting("cloud_server_object")
     if server_json and server_json ~= "" then
         local server = json.decode(server_json)
         SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
-            return annotations.sync_callback(self, local_file, cached_file, income_file)
+            return annotations.sync_callback(widget, local_file, cached_file, income_file)
         end, false)
     else
         UIManager:show(InfoMessage:new{
