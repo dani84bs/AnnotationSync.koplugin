@@ -59,9 +59,10 @@ filesystem or the contents of the files.
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
 
 ## 📄 Known Issues
+- Can't synchronize pdf higlights due to their different data structure.  Working on a Fix
 - ~~Binding the "Annotation Sync: Manual Sync" action to a profile with "Auto-execute -> on book closing" will cause KOReader to crash.~~ Fixed
 - ~~At the moment intersections between highlights spanning different
-epub blocks may not be detected.~~ Fixed in [4ae7868](https://github.com/dani84bs/AnnotationSync.koplugin/commit/4ae7868057991f57ab2d7ff865d1201ebfd5e53e)
+epub blocks may not be detected.~~ Fixed 
 
 ---
 
