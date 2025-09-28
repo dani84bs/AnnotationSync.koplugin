@@ -29,13 +29,26 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
         sorting_hint = "tools",
         sub_item_table = {{
             text = _("Settings"),
-            callback = function()
-                local sync_service = SyncService:new{}
-                sync_service.onConfirm = function(server)
-                    self:onSyncServiceConfirm(server)
+            sub_item_table = {{
+                text = _("Cloud settings"),
+                callback = function()
+                    local sync_service = SyncService:new{}
+                    sync_service.onConfirm = function(server)
+                        self:onSyncServiceConfirm(server)
+                    end
+                    UIManager:show(sync_service)
                 end
-                UIManager:show(sync_service)
-            end
+            }, {
+                text = _("Use filename instead of hash"),
+                checked_func = function()
+                    return G_reader_settings:isTrue("annotation_sync_use_filename")
+                end,
+                callback = function()
+                    local current = G_reader_settings:isTrue("annotation_sync_use_filename")
+                    G_reader_settings:saveSetting("annotation_sync_use_filename", not current)
+                    UIManager:close()
+                end
+            }}
         }, {
             text = _("Manual Sync"),
             enabled = (G_reader_settings:readSetting("cloud_download_dir") or "") ~= "",
@@ -77,13 +90,20 @@ function AnnotationSyncPlugin:manualSync()
         return
     end
 
-    local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
+    local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
         return
     end
     local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local annotation_filename = hash .. ".json"
+    local annotation_filename
+    if use_filename then
+        local filename = file:match("([^/]+)$") or file
+        annotation_filename = filename .. ".json"
+    else
+        local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
+        annotation_filename = hash .. ".json"
+    end
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir)
     remote.sync_annotations(self, json_path)
