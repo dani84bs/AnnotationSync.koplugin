@@ -42,7 +42,7 @@ Setting up Dropbox on Koreader can be a little bit difficult.
 ## Details
 AnnotationSync stores its files directly in the selected cloud storage
 directory, so you may want to create a new directory dedicated to AnnotationSync.
-The sync files are named according to a hash of the document being synced, so it
+By using the default settings (i.e. "Use filename instead of hash" unchecked) the sync files are named according to a hash of the document being synced, so it
 will look something like this:
 
 ```
@@ -54,6 +54,11 @@ dda324e17e50f6c8c4c481ee4fcb1aa4.json
 
 There is currently no other identifying information about the original document name stored in either the
 filesystem or the contents of the files.
+
+If you prefer to use the filename instead of an hash of the content just check the box under:
+Tools -> AnnotationSync -> Settings -> Use filename instead of hash
+By doing so the filename on every device should be the same.
+This option should be chosen by users that change file metadata (e.g. with Calibre) otherwise the hash would change everytime you make any modification.
 
 ## 🤝 Contributing
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
