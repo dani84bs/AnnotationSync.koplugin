@@ -1,4 +1,3 @@
-
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
@@ -53,7 +52,14 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
 end
 
 function AnnotationSyncPlugin:onDispatcherRegisterActions()
-    Dispatcher:registerAction("annotation_sync_manual_sync", { category="none", event="AnnotationSyncManualSync", title=_("AnnotationSync: Manual Sync"), text=_("Sync annotations and bookmarks with AnnotationSync."), separator=true, reader=true,})
+    Dispatcher:registerAction("annotation_sync_manual_sync", {
+        category = "none",
+        event = "AnnotationSyncManualSync",
+        title = _("AnnotationSync: Manual Sync"),
+        text = _("Sync annotations and bookmarks with AnnotationSync."),
+        separator = true,
+        reader = true
+    })
 end
 
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)

@@ -41,18 +41,27 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir)
 end
 
 function M.is_annotation(candidate)
-    return candidate and type(candidate.pos0) == "string" and type(candidate.pos1) == "string"
+    return candidate and candidate.pos0 and candidate.pos1
 end
 
 function M.is_bookmark(candidate)
-    return candidate and type(candidate.page) == "string" and not M.is_annotation(candidate)
+    return candidate and candidate.page and not M.is_annotation(candidate)
 end
 
 function M.annotation_key(annotation)
     if M.is_annotation(annotation) then
-        return annotation.pos0 .. "|" .. annotation.pos1
+        local p0 = ""
+        local p1 = ""
+        if type(annotation.pos0) == "table" then
+            p0 = tostring(annotation.pos0.x / annotation.pos0.zoom)
+            p1 = tostring(annotation.pos1.x / annotation.pos1.zoom)
+        else
+            p0 = annotation.pos0
+            p1 = annotation.pos1
+        end
+        return p0 .. "|" .. p1
     elseif M.is_bookmark(annotation) then
-        return "BOOKMARK|" .. annotation.page
+        return "BOOKMARK|" .. tostring(annotation.page)
     end
 end
 
@@ -83,6 +92,18 @@ function M.map_to_list(map)
     return list
 end
 
+local function compare_positions(a, b, document)
+    if type(a) == "number" and type(b) == "number" then
+        return b - a
+    end
+    if type(a) == "string" and type(b) == "string" then
+        return document:compareXPointers(a, b)
+    end
+    if type(a) == "table" and type(b) == "table" then
+        return document:comparePositions(a, b)
+    end
+end
+
 local function positions_intersect(a, b, document)
     if not a or not b then
         return false
@@ -97,12 +118,12 @@ local function positions_intersect(a, b, document)
     end
 
     -- A_Start <= B_Start <= A_End
-    if document:compareXPointers(a.pos0, b.pos0) >= 0 and document:compareXPointers(b.pos0, a.pos1) >= 0 then
+    if compare_positions(a.pos0, b.pos0, document) >= 0 and compare_positions(b.pos0, a.pos1, document) >= 0 then
         return true
     end
 
     -- B_Start <= A_Start <= B_End
-    if document:compareXPointers(b.pos0, a.pos0) >= 0 and document:compareXPointers(a.pos0, b.pos1) >= 0 then
+    if compare_positions(b.pos0, a.pos0, document) >= 0 and compare_positions(a.pos0, b.pos1, document) >= 0 then
         return true
     end
 
@@ -170,11 +191,19 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
     if widget and widget.ui and widget.ui.annotation then
         local merged_list = M.map_to_list(merged)
         table.sort(merged_list, function(a, b)
-            return widget.ui.document:compareXPointers(a.page, b.page) > 0
+            return compare_positions(a.page, b.page, widget.ui.document) > 0
         end)
         widget.ui.annotation.annotations = merged_list
         widget.ui.annotation:onSaveSettings()
-        widget.ui.document:render()
+        if widget.ui.document.is_pdf then
+            print("###########################################")
+            for k, v in pairs(widget.ui.document._document) do
+                print(k, ": Value:", v)
+            end
+            -- widget.ui.document:renderPage(widget.ui.document.current_page, nil, 1.0, 0, 1.0, true)
+        else
+            widget.ui.document:render()
+        end
     end
 
     local f = io.open(local_file, "w")
