@@ -2,6 +2,8 @@ local docsettings = require("frontend/docsettings")
 local utils = require("utils")
 local util = require("util")
 local json = require("json")
+local UIManager = require("ui/uimanager")
+local Event = require("ui/event")
 
 local M = {}
 
@@ -167,7 +169,7 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
                 if ann_time < new_time then
                     map[key] = nil -- Remove older
                 else
-                    return false -- Do not add new_ann if older
+                    return false   -- Do not add new_ann if older
                 end
             end
         end
@@ -193,14 +195,11 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
         end)
         widget.ui.annotation.annotations = merged_list
         widget.ui.annotation:onSaveSettings()
-        if widget.ui.document.is_pdf then
-            print("###########################################")
-            for k, v in pairs(widget.ui.document._document) do
-                print(k, ": Value:", v)
-            end
-            -- widget.ui.document:renderPage(widget.ui.document.current_page, nil, 1.0, 0, 1.0, true)
-        else
+        UIManager:broadcastEvent(Event:new("AnnotationsModified", widget.ui.annotation.annotations))
+        if not widget.ui.document.is_pdf then
             widget.ui.document:render()
+            widget.ui.view:recalculate()
+            UIManager:setDirty(widget.ui.view.dialog, "partial")
         end
     end
 
@@ -213,4 +212,3 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
 end
 
 return M
-
