@@ -12,7 +12,7 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 
-local AnnotationSyncPlugin = WidgetContainer:extend{
+local AnnotationSyncPlugin = WidgetContainer:extend {
     name = "AnnotationSync",
     is_doc_only = true
 }
@@ -27,12 +27,12 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
     menu_items.annotation_sync_plugin = {
         text = _("Annotation Sync"),
         sorting_hint = "tools",
-        sub_item_table = {{
+        sub_item_table = { {
             text = _("Settings"),
-            sub_item_table = {{
+            sub_item_table = { {
                 text = _("Cloud settings"),
                 callback = function()
-                    local sync_service = SyncService:new{}
+                    local sync_service = SyncService:new {}
                     sync_service.onConfirm = function(server)
                         self:onSyncServiceConfirm(server)
                     end
@@ -48,14 +48,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     G_reader_settings:saveSetting("annotation_sync_use_filename", not current)
                     UIManager:close()
                 end
-            }}
+            } }
         }, {
             text = _("Manual Sync"),
             enabled = (G_reader_settings:readSetting("cloud_download_dir") or "") ~= "",
             callback = function()
                 self:manualSync()
             end
-        }}
+        } }
     }
 end
 
@@ -107,7 +107,6 @@ function AnnotationSyncPlugin:manualSync()
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
     remote.sync_annotations(self, json_path)
-
 end
 
 return AnnotationSyncPlugin
