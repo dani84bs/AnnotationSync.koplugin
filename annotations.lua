@@ -195,7 +195,9 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
         end)
         widget.ui.annotation.annotations = merged_list
         widget.ui.annotation:onSaveSettings()
-        UIManager:broadcastEvent(Event:new("AnnotationsModified", widget.ui.annotation.annotations))
+        if #merged_list > 0 then
+            UIManager:broadcastEvent(Event:new("AnnotationsModified", widget.ui.annotation.annotations))
+        end
         if not widget.ui.document.is_pdf then
             widget.ui.document:render()
             widget.ui.view:recalculate()
