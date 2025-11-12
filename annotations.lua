@@ -1,6 +1,5 @@
 local docsettings = require("frontend/docsettings")
 local utils = require("utils")
-local util = require("util")
 local json = require("json")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
