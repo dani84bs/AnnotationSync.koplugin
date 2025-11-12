@@ -165,14 +165,14 @@ end
 
 function M.sync_callback(widget, local_file, last_sync_file, income_file)
     local local_map = utils.read_json(local_file)
-    local cached_map = utils.read_json(last_sync_file)
+    local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
     local document = widget.ui.document
     -- Mark deleted annotations in local_map
-    M.get_deleted_annotations(local_map, cached_map, document)
+    M.get_deleted_annotations(local_map, last_sync_map, document)
     -- Merge logic: local wins, then income, then cached
     local merged = {}
-    for k, v in pairs(cached_map) do
+    for k, v in pairs(last_sync_map) do
         merged[k] = v
     end
     -- Merge income_map
