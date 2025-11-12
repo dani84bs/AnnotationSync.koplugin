@@ -155,8 +155,9 @@ local function resolve_intersections(map, new_ann, document)
             local new_time = new_ann.datetime_updated or new_ann.datetime or 0
             if ann_time < new_time then
                 map[key] = nil -- Remove older
+                return true
             else
-                return false   -- Do not add new_ann if older
+                return false -- Do not add new_ann if older
             end
         end
     end
@@ -164,29 +165,26 @@ local function resolve_intersections(map, new_ann, document)
 end
 
 function M.sync_callback(widget, local_file, last_sync_file, income_file)
+    local t0 = os.time()
     local local_map = utils.read_json(local_file)
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
     local document = widget.ui.document
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, last_sync_map, document)
-    -- Merge logic: local wins, then income, then cached
+    -- Merge logic: local wins, then income
     local merged = {}
-    for k, v in pairs(last_sync_map) do
+    for k, v in pairs(income_map) do
         merged[k] = v
     end
-    -- Merge income_map
-    for k, v in pairs(income_map) do
-        if resolve_intersections(merged, v, document) then
-            merged[k] = v
-        end
-    end
-    -- Merge local_map
+
     for k, v in pairs(local_map) do
         if resolve_intersections(merged, v, document) then
             merged[k] = v
         end
     end
+    local t1 = os.time()
+    print("Merging annotations took " .. tostring(t1 - t0) .. " seconds")
 
     if widget and widget.ui and widget.ui.annotation then
         local merged_list = M.map_to_list(merged)
