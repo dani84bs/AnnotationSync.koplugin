@@ -163,9 +163,9 @@ local function resolve_intersections(map, new_ann, document)
     return true -- Safe to add new_ann
 end
 
-function M.sync_callback(widget, local_file, cached_file, income_file)
+function M.sync_callback(widget, local_file, last_sync_file, income_file)
     local local_map = utils.read_json(local_file)
-    local cached_map = utils.read_json(cached_file)
+    local cached_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
     local document = widget.ui.document
     -- Mark deleted annotations in local_map
