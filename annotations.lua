@@ -147,6 +147,22 @@ function M.get_deleted_annotations(local_map, cached_map, document)
     end
 end
 
+-- Helper to resolve intersecting highlights by datetime_updated
+local function resolve_intersections(map, new_ann, document)
+    for key, ann in pairs(map) do
+        if positions_intersect(ann, new_ann, document) then
+            local ann_time = ann.datetime_updated or ann.datetime or 0
+            local new_time = new_ann.datetime_updated or new_ann.datetime or 0
+            if ann_time < new_time then
+                map[key] = nil -- Remove older
+            else
+                return false   -- Do not add new_ann if older
+            end
+        end
+    end
+    return true -- Safe to add new_ann
+end
+
 function M.sync_callback(widget, local_file, cached_file, income_file)
     local local_map = utils.read_json(local_file)
     local cached_map = utils.read_json(cached_file)
@@ -159,30 +175,15 @@ function M.sync_callback(widget, local_file, cached_file, income_file)
     for k, v in pairs(cached_map) do
         merged[k] = v
     end
-    -- Helper to resolve intersecting highlights by datetime_updated
-    local function resolve_intersections(map, new_ann)
-        for key, ann in pairs(map) do
-            if positions_intersect(ann, new_ann, document) then
-                local ann_time = ann.datetime_updated or ann.datetime or 0
-                local new_time = new_ann.datetime_updated or new_ann.datetime or 0
-                if ann_time < new_time then
-                    map[key] = nil -- Remove older
-                else
-                    return false   -- Do not add new_ann if older
-                end
-            end
-        end
-        return true -- Safe to add new_ann
-    end
     -- Merge income_map
     for k, v in pairs(income_map) do
-        if resolve_intersections(merged, v) then
+        if resolve_intersections(merged, v, document) then
             merged[k] = v
         end
     end
     -- Merge local_map
     for k, v in pairs(local_map) do
-        if resolve_intersections(merged, v) then
+        if resolve_intersections(merged, v, document) then
             merged[k] = v
         end
     end
