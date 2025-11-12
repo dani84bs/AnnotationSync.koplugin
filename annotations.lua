@@ -129,19 +129,19 @@ local function positions_intersect(a, b, document)
     return false
 end
 
-function M.get_deleted_annotations(local_map, cached_map, document)
-    if type(cached_map) == "table" and type(local_map) == "table" then
-        for cached_k, cached_v in pairs(cached_map) do
-            local found = false
-            for local_k, local_v in pairs(local_map) do
-                if positions_intersect(cached_v, local_v, document) then
-                    found = true
+function M.get_deleted_annotations(local_map, last_uploaded_map, document)
+    if type(last_uploaded_map) == "table" and type(local_map) == "table" then
+        for uploaded_k, uploaded_v in pairs(last_uploaded_map) do
+            local local_and_uploaded = false
+            for _, local_v in pairs(local_map) do
+                if positions_intersect(uploaded_v, local_v, document) then
+                    local_and_uploaded = true
                     break
                 end
             end
-            if not found then
-                cached_v.deleted = true
-                local_map[cached_k] = cached_v
+            if not local_and_uploaded then
+                uploaded_v.deleted = true
+                local_map[uploaded_k] = uploaded_v
             end
         end
     end
