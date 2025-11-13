@@ -147,17 +147,20 @@ function M.get_deleted_annotations(local_map, last_uploaded_map, document)
     end
 end
 
--- Helper to resolve intersecting highlights by datetime_updated
+local function is_before(a, b)
+    local a_time = a.datetime_updated or a.datetime or 0
+    local b_time = b.datetime_updated or b.datetime or 0
+    return a_time < b_time
+end
+
 local function resolve_intersections(map, new_ann, document)
     for key, ann in pairs(map) do
         if positions_intersect(ann, new_ann, document) then
-            local ann_time = ann.datetime_updated or ann.datetime or 0
-            local new_time = new_ann.datetime_updated or new_ann.datetime or 0
-            if ann_time < new_time then
-                map[key] = nil -- Remove older
+            if is_before(ann, new_ann) then
+                map[key] = nil -- Remove ann because  is older
                 return true
             else
-                return false -- Do not add new_ann if older
+                return false -- Do not add new_ann because is older
             end
         end
     end
