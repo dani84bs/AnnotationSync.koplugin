@@ -117,6 +117,7 @@ local function sort_keys_by_position(t, document)
     end)
     return keys
 end
+
 local function positions_intersect(a, b, document)
     if not a or not b then
         return false
@@ -176,42 +177,61 @@ local function is_before(a, b)
     return a_time < b_time
 end
 
-local function resolve_intersections(map, new_ann, document)
-    for key, ann in pairs(map) do
-        if positions_intersect(ann, new_ann, document) then
-            if is_before(ann, new_ann) then
-                map[key] = nil -- Remove ann because  is older
-                return true
-            else
-                return false -- Do not add new_ann because is older
-            end
-        end
-    end
-    return true -- Safe to add new_ann
-end
-
 
 function M.sync_callback(widget, local_file, last_sync_file, income_file)
-    local t0 = os.time()
     local local_map = utils.read_json(local_file)
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
     local document = widget.ui.document
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, last_sync_map, document)
-    -- Merge logic: local wins, then income
     local merged = {}
-    for k, v in pairs(income_map) do
-        merged[k] = v
-    end
 
-    for k, v in pairs(local_map) do
-        if resolve_intersections(merged, v, document) then
-            merged[k] = v
+    local local_keys = sort_keys_by_position(local_map, document)
+    local income_keys = sort_keys_by_position(income_map, document)
+    local l = 1
+    local i = 1
+
+    while i <= #income_keys and l <= #local_keys do
+        local income_k = income_keys[i]
+        local local_k = local_keys[l]
+        local income_v = income_map[income_k]
+        local local_v = local_map[local_k]
+
+        if positions_intersect(income_v, local_v, document) then
+            if is_before(income_v, local_v) then
+                merged[local_k] = local_v
+            else
+                merged[income_k] = income_v
+            end
+            i = i + 1
+            l = l + 1
+        else
+            local local_p = local_v.pos0 or local_v.page
+            local income_p = income_v.pos0 or income_v.page
+            if compare_positions(local_p, income_p, document) > 0 then
+                merged[local_k] = local_v
+                l = l + 1
+            else
+                merged[income_k] = income_v
+                i = i + 1
+            end
         end
     end
-    local t1 = os.time()
-    print("Merging annotations took " .. tostring(t1 - t0) .. " seconds")
+
+    while l <= #local_keys do
+        local local_k = local_keys[l]
+        local local_v = local_map[local_k]
+        merged[local_k] = local_v
+        l = l + 1
+    end
+
+    while i <= #income_keys do
+        local income_k = income_keys[i]
+        local income_v = income_map[income_k]
+        merged[income_k] = income_v
+        i = i + 1
+    end
 
     if widget and widget.ui and widget.ui.annotation then
         local merged_list = M.map_to_list(merged)
