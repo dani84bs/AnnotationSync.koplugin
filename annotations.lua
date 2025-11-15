@@ -141,6 +141,7 @@ function M.get_deleted_annotations(local_map, last_uploaded_map, document)
             end
             if not local_and_uploaded then
                 uploaded_v.deleted = true
+                uploaded_v.datetime_updated = os.date("%Y-%m-%d %H:%M:%S")
                 local_map[uploaded_k] = uploaded_v
             end
         end
