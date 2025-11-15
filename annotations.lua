@@ -103,6 +103,20 @@ local function compare_positions(a, b, document)
     end
 end
 
+local function sort_keys_by_position(t, document)
+    local keys = {}
+    for k in pairs(t) do
+        table.insert(keys, k)
+    end
+    table.sort(keys, function(a, b)
+        local ann_a = t[a]
+        local ann_b = t[b]
+        local pos_a = ann_a.pos0 or ann_a.page
+        local pos_b = ann_b.pos0 or ann_b.page
+        return compare_positions(pos_a, pos_b, document) > 0
+    end)
+    return keys
+end
 local function positions_intersect(a, b, document)
     if not a or not b then
         return false
@@ -131,11 +145,19 @@ end
 
 function M.get_deleted_annotations(local_map, last_uploaded_map, document)
     if type(last_uploaded_map) == "table" and type(local_map) == "table" then
-        for uploaded_k, uploaded_v in pairs(last_uploaded_map) do
+        local local_keys = sort_keys_by_position(local_map, document)
+        local uploaded_keys = sort_keys_by_position(last_uploaded_map, document)
+
+        for _, uploaded_k in ipairs(uploaded_keys) do
+            local uploaded_v = last_uploaded_map[uploaded_k]
             local local_and_uploaded = false
-            for _, local_v in pairs(local_map) do
+            for _, local_k in ipairs(local_keys) do
+                local local_v = local_map[local_k]
                 if positions_intersect(uploaded_v, local_v, document) then
                     local_and_uploaded = true
+                    break
+                end
+                if compare_positions(local_v.page, uploaded_v.page, document) < 0 then
                     break
                 end
             end
@@ -167,6 +189,7 @@ local function resolve_intersections(map, new_ann, document)
     end
     return true -- Safe to add new_ann
 end
+
 
 function M.sync_callback(widget, local_file, last_sync_file, income_file)
     local t0 = os.time()
