@@ -1,6 +1,5 @@
 local docsettings = require("frontend/docsettings")
 local utils = require("utils")
-local util = require("util")
 local json = require("json")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
@@ -104,6 +103,21 @@ local function compare_positions(a, b, document)
     end
 end
 
+local function sort_keys_by_position(t, document)
+    local keys = {}
+    for k in pairs(t) do
+        table.insert(keys, k)
+    end
+    table.sort(keys, function(a, b)
+        local ann_a = t[a]
+        local ann_b = t[b]
+        local pos_a = ann_a.pos0 or ann_a.page
+        local pos_b = ann_b.pos0 or ann_b.page
+        return compare_positions(pos_a, pos_b, document) > 0
+    end)
+    return keys
+end
+
 local function positions_intersect(a, b, document)
     if not a or not b then
         return false
@@ -130,62 +144,93 @@ local function positions_intersect(a, b, document)
     return false
 end
 
-function M.get_deleted_annotations(local_map, cached_map, document)
-    if type(cached_map) == "table" and type(local_map) == "table" then
-        for cached_k, cached_v in pairs(cached_map) do
-            local found = false
-            for local_k, local_v in pairs(local_map) do
-                if positions_intersect(cached_v, local_v, document) then
-                    found = true
+function M.get_deleted_annotations(local_map, last_uploaded_map, document)
+    if type(last_uploaded_map) == "table" and type(local_map) == "table" then
+        local local_keys = sort_keys_by_position(local_map, document)
+        local uploaded_keys = sort_keys_by_position(last_uploaded_map, document)
+
+        for _, uploaded_k in ipairs(uploaded_keys) do
+            local uploaded_v = last_uploaded_map[uploaded_k]
+            local local_and_uploaded = false
+            for _, local_k in ipairs(local_keys) do
+                local local_v = local_map[local_k]
+                if positions_intersect(uploaded_v, local_v, document) then
+                    local_and_uploaded = true
+                    break
+                end
+                if compare_positions(local_v.page, uploaded_v.page, document) < 0 then
                     break
                 end
             end
-            if not found then
-                cached_v.deleted = true
-                local_map[cached_k] = cached_v
+            if not local_and_uploaded then
+                uploaded_v.deleted = true
+                uploaded_v.datetime_updated = os.date("%Y-%m-%d %H:%M:%S")
+                local_map[uploaded_k] = uploaded_v
             end
         end
     end
 end
 
-function M.sync_callback(widget, local_file, cached_file, income_file)
+local function is_before(a, b)
+    local a_time = a.datetime_updated or a.datetime or 0
+    local b_time = b.datetime_updated or b.datetime or 0
+    return a_time < b_time
+end
+
+
+function M.sync_callback(widget, local_file, last_sync_file, income_file)
     local local_map = utils.read_json(local_file)
-    local cached_map = utils.read_json(cached_file)
+    local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
     local document = widget.ui.document
     -- Mark deleted annotations in local_map
-    M.get_deleted_annotations(local_map, cached_map, document)
-    -- Merge logic: local wins, then income, then cached
+    M.get_deleted_annotations(local_map, last_sync_map, document)
     local merged = {}
-    for k, v in pairs(cached_map) do
-        merged[k] = v
-    end
-    -- Helper to resolve intersecting highlights by datetime_updated
-    local function resolve_intersections(map, new_ann)
-        for key, ann in pairs(map) do
-            if positions_intersect(ann, new_ann, document) then
-                local ann_time = ann.datetime_updated or ann.datetime or 0
-                local new_time = new_ann.datetime_updated or new_ann.datetime or 0
-                if ann_time < new_time then
-                    map[key] = nil -- Remove older
-                else
-                    return false   -- Do not add new_ann if older
-                end
+
+    local local_keys = sort_keys_by_position(local_map, document)
+    local income_keys = sort_keys_by_position(income_map, document)
+    local l = 1
+    local i = 1
+
+    while i <= #income_keys and l <= #local_keys do
+        local income_k = income_keys[i]
+        local local_k = local_keys[l]
+        local income_v = income_map[income_k]
+        local local_v = local_map[local_k]
+
+        if positions_intersect(income_v, local_v, document) then
+            if is_before(income_v, local_v) then
+                merged[local_k] = local_v
+            else
+                merged[income_k] = income_v
+            end
+            i = i + 1
+            l = l + 1
+        else
+            local local_p = local_v.pos0 or local_v.page
+            local income_p = income_v.pos0 or income_v.page
+            if compare_positions(local_p, income_p, document) > 0 then
+                merged[local_k] = local_v
+                l = l + 1
+            else
+                merged[income_k] = income_v
+                i = i + 1
             end
         end
-        return true -- Safe to add new_ann
     end
-    -- Merge income_map
-    for k, v in pairs(income_map) do
-        if resolve_intersections(merged, v) then
-            merged[k] = v
-        end
+
+    while l <= #local_keys do
+        local local_k = local_keys[l]
+        local local_v = local_map[local_k]
+        merged[local_k] = local_v
+        l = l + 1
     end
-    -- Merge local_map
-    for k, v in pairs(local_map) do
-        if resolve_intersections(merged, v) then
-            merged[k] = v
-        end
+
+    while i <= #income_keys do
+        local income_k = income_keys[i]
+        local income_v = income_map[income_k]
+        merged[income_k] = income_v
+        i = i + 1
     end
 
     if widget and widget.ui and widget.ui.annotation then

@@ -17,7 +17,7 @@ function M.sync_annotations(widget, json_path)
             return annotations.sync_callback(widget, local_file, cached_file, income_file)
         end, false)
     else
-        UIManager:show(InfoMessage:new{
+        UIManager:show(InfoMessage:new {
             text = T(_("No cloud destination set in settings.")),
             timeout = 4
         })
@@ -30,7 +30,7 @@ function M.save_server_settings(server)
     if server.type then
         G_reader_settings:saveSetting("cloud_provider_type", server.type)
     end
-    UIManager:show(InfoMessage:new{
+    UIManager:show(InfoMessage:new {
         text = T(_("Cloud destination set to:\n%1\nProvider: %2\nPlease restart KOReader for changes to take effect."),
             server.url, server.type or "unknown"),
         timeout = 4
