@@ -35,6 +35,10 @@
   - Or bind the "Annotation Sync: Manual Sync" action to a gesture or keyboard shortcut
   - Or add the "Annotation Sync: Manual Sync" action to a profile action list
 
+- Sync old annotations:
+  - The plugin keeps track of the annotations you make without syncing (like when offline).
+  - Use the "Annotation Sync: Sync All" button to mass upload them.
+
 ### 📦 DropBox setup
 Setting up Dropbox on Koreader can be a little bit difficult. 
 [This excellent post on mobileread forum](https://www.mobileread.com/forums/showthread.php?t=353670) explains the procedure in detail.
