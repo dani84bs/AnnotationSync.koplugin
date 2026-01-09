@@ -109,4 +109,12 @@ function AnnotationSyncPlugin:manualSync()
     remote.sync_annotations(self, json_path)
 end
 
+
+function AnnotationSyncPlugin:onAnnotationsModified(payload)
+    if not payload then return end
+    if (payload.nb_highlights_added and payload.nb_highlights_added > 0) or payload[2] then
+        self:manualSync()
+    end
+end
+
 return AnnotationSyncPlugin
