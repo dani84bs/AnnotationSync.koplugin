@@ -7,6 +7,7 @@ local SyncService = require("apps/cloudstorage/syncservice")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
+local DataStorage = require("datastorage")
 
 local annotations = require("annotations")
 local remote = require("remote")
@@ -14,7 +15,8 @@ local utils = require("utils")
 
 local AnnotationSyncPlugin = WidgetContainer:extend {
     name = "AnnotationSync",
-    is_doc_only = true
+    is_doc_only = true,
+    _changed_documents = {}, -- Track changed documents
 }
 
 function AnnotationSyncPlugin:init()
@@ -109,12 +111,43 @@ function AnnotationSyncPlugin:manualSync()
     remote.sync_annotations(self, json_path)
 end
 
-
 function AnnotationSyncPlugin:onAnnotationsModified(payload)
-    if not payload then return end
-    if (payload.nb_highlights_added and payload.nb_highlights_added > 0) or payload[2] then
-        self:manualSync()
+    -- Try to get the document from the UI context
+    local document = self.ui and self.ui.document
+    if document and document.file then
+        local changed_file = document.file
+        print("Document changed: " .. changed_file)
+        -- Track in a Lua file in the user data directory
+        local data_dir = DataStorage:getDataDir()
+        local track_path = data_dir .. "/changed_documents.lua"
+        -- Load existing table or create new
+        local changed_docs = {}
+        local ok, loaded = pcall(dofile, track_path)
+        if ok and type(loaded) == "table" then
+            changed_docs = loaded
+        end
+        changed_docs[changed_file] = true
+        -- Write table to file
+        local f = io.open(track_path, "w")
+        if f then
+            f:write("return ", serialize_table(changed_docs), "\n")
+            f:close()
+        else
+            print("Failed to open track file: " .. track_path)
+        end
+    else
+        print("Document change detected, but no document context available.")
     end
+end
+
+-- Helper to serialize a Lua table as code
+function serialize_table(tbl)
+    local result = "{\n"
+    for k, v in pairs(tbl) do
+        result = result .. string.format("  [%q] = %s,\n", k, tostring(v))
+    end
+    result = result .. "}"
+    return result
 end
 
 return AnnotationSyncPlugin
