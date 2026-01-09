@@ -109,6 +109,23 @@ function AnnotationSyncPlugin:manualSync()
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
     remote.sync_annotations(self, json_path)
+
+    -- Remove from changed_documents.lua if present (very last action)
+    local data_dir = DataStorage:getDataDir()
+    local track_path = data_dir .. "/changed_documents.lua"
+    local changed_docs = {}
+    local ok, loaded = pcall(dofile, track_path)
+    if ok and type(loaded) == "table" then
+        changed_docs = loaded
+    end
+    if changed_docs[file] then
+        changed_docs[file] = nil
+        local f = io.open(track_path, "w")
+        if f then
+            f:write("return ", serialize_table(changed_docs), "\n")
+            f:close()
+        end
+    end
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(payload)
