@@ -7,19 +7,7 @@ local Event = require("ui/event")
 local M = {}
 
 function M.flush_metadata(document, stored_annotations)
-    if document and document.file then
-        local ds = docsettings:open(document.file)
-        if ds and type(ds.flush) == "function" then
-            pcall(function()
-                ds:flush()
-            end)
-        end
-        if ds and type(ds.close) == "function" then
-            pcall(function()
-                ds:close()
-            end)
-        end
-    end
+    UIManager:broadcastEvent(Event:new("FlushSettings"))
 end
 
 function M.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
