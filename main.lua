@@ -17,9 +17,12 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 
+local manual_sync_description = "Sync annotations and bookmarks of the active document."
+local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
+
 local AnnotationSyncPlugin = WidgetContainer:extend {
     name = "AnnotationSync",
-    is_doc_only = true,
+    is_doc_only = false,
     _changed_documents = {}, -- Track changed documents
 }
 
@@ -57,13 +60,19 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             } }
         }, {
             text = _("Manual Sync"),
-            enabled = (G_reader_settings:readSetting("cloud_download_dir") or "") ~= "",
+            enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
+            hold_callback = function()
+                utils.show_msg(manual_sync_description)
+            end,
             callback = function()
                 self:manualSync()
             end
         }, {
             text = _("Sync All"),
             enabled = true,
+            hold_callback = function()
+                utils.show_msg(sync_all_description)
+            end,
             callback = function()
                 self:syncAllChangedDocuments()
             end
@@ -94,9 +103,9 @@ function AnnotationSyncPlugin:syncAllChangedDocuments()
         end
     end
     if count == 0 then
-        utils.show_msg("Changed documents exist, but none could be synced.")
+        utils.show_msg("Unable to sync modified documents: " .. total)
     else
-        utils.show_msg("Synced " .. count .. " document(s).")
+        utils.show_msg("Successfully synced modified documents: " .. count)
     end
 end
 
@@ -151,7 +160,7 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         category = "none",
         event = "AnnotationSyncManualSync",
         title = _("AnnotationSync: Manual Sync"),
-        text = _("Sync annotations and bookmarks of current document with AnnotationSync."),
+        text = _(manual_sync_description),
         separator = true,
         reader = true
     })
@@ -176,7 +185,7 @@ function AnnotationSyncPlugin:manualSync()
     local document = self.ui and self.ui.document
     local file = document and document.file
     if not file then
-        utils.show_msg("A document must be active to sync.")
+        utils.show_msg("A document must be active to do a manual sync.")
         return
     end
     self:syncDocument(document)
