@@ -179,41 +179,9 @@ function AnnotationSyncPlugin:manualSync()
         utils.show_msg("A document must be active to sync.")
         return
     end
-
-    local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
-    local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then
-        return
-    end
-    local stored_annotations = self.ui.annotation and self.ui.annotation.annotations or {}
-    local annotation_filename
-    if use_filename then
-        local filename = file:match("([^/]+)$") or file
-        annotation_filename = filename .. ".json"
-    else
-        local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
-        annotation_filename = hash .. ".json"
-    end
-    local json_path = sdr_dir .. "/" .. annotation_filename
-    annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
-    remote.sync_annotations(self, json_path)
-
-    -- Remove from changed_documents.lua if present (very last action)
-    local track_path = self:changedDocumentsFile()
-    local changed_docs = {}
-    local ok, loaded = pcall(dofile, track_path)
-    if ok and type(loaded) == "table" then
-        changed_docs = loaded
-    end
-    if changed_docs[file] then
-        changed_docs[file] = nil
-        local f = io.open(track_path, "w")
-        if f then
-            f:write("return ", serialize_table(changed_docs), "\n")
-            f:close()
-        end
-    end
+    self:syncDocument(document)
 end
+
 
 function AnnotationSyncPlugin:onAnnotationsModified(payload)
     -- Try to get the document from the UI context
