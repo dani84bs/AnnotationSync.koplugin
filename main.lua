@@ -136,6 +136,11 @@ function AnnotationSyncPlugin:getDocumentByFile(file)
     return DocumentRegistry:openDocument(file)
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncSyncAll()
+    self:syncAllChangedDocuments()
+    return true
+end
+
 function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     self:manualSync()
     return true
@@ -146,9 +151,17 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         category = "none",
         event = "AnnotationSyncManualSync",
         title = _("AnnotationSync: Manual Sync"),
-        text = _("Sync annotations and bookmarks with AnnotationSync."),
+        text = _("Sync annotations and bookmarks of current document with AnnotationSync."),
         separator = true,
         reader = true
+    })
+    Dispatcher:registerAction("annotation_sync_sync_all", {
+        category = "none",
+        event = "AnnotationSyncSyncAll",
+        title = _("AnnotationSync: Sync All"),
+        text = _(sync_all_description),
+        separator = true,
+        general = true
     })
 end
 
