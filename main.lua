@@ -1,6 +1,7 @@
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
+local DocumentRegistry = require("document/documentregistry")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
@@ -65,9 +66,8 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             end
         } }
     }
-    -- Sync all changed documents listed in changed_documents.lua
-    local DocumentRegistry = require("document/documentregistry")
 
+    -- Sync all changed documents listed in changed_documents.lua
     function AnnotationSyncPlugin:syncAllChangedDocuments()
         local data_dir = DataStorage:getDataDir()
         local track_path = data_dir .. "/changed_documents.lua"
