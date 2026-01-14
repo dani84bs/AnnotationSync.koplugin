@@ -9,6 +9,7 @@ local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
 local DataStorage = require("datastorage")
+local logger = require("logger")
 
 local annotations = require("annotations")
 local remote = require("remote")
@@ -71,8 +72,7 @@ end
 
 -- Sync all changed documents listed in changed_documents.lua
 function AnnotationSyncPlugin:syncAllChangedDocuments()
-    local data_dir = DataStorage:getDataDir()
-    local track_path = data_dir .. "/changed_documents.lua"
+    local track_path = self:changedDocumentsFile()
     local ok, changed_docs = pcall(dofile, track_path)
     if not ok or type(changed_docs) ~= "table" then
         utils.show_msg("No changed documents to sync.")
@@ -123,21 +123,7 @@ function AnnotationSyncPlugin:syncDocument(document)
     annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
     remote.sync_annotations(self, json_path)
     -- Remove from changed_documents.lua if present (very last action)
-    local data_dir = DataStorage:getDataDir()
-    local track_path = data_dir .. "/changed_documents.lua"
-    local changed_docs = {}
-    local ok, loaded = pcall(dofile, track_path)
-    if ok and type(loaded) == "table" then
-        changed_docs = loaded
-    end
-    if changed_docs[file] then
-        changed_docs[file] = nil
-        local f = io.open(track_path, "w")
-        if f then
-            f:write("return ", serialize_table(changed_docs), "\n")
-            f:close()
-        end
-    end
+    self:removeFromChangedDocumentsFile(document)
 end
 
 -- Helper to get a document object by file path (stub, needs integration with document management)
@@ -201,8 +187,7 @@ function AnnotationSyncPlugin:manualSync()
     remote.sync_annotations(self, json_path)
 
     -- Remove from changed_documents.lua if present (very last action)
-    local data_dir = DataStorage:getDataDir()
-    local track_path = data_dir .. "/changed_documents.lua"
+    local track_path = self:changedDocumentsFile()
     local changed_docs = {}
     local ok, loaded = pcall(dofile, track_path)
     if ok and type(loaded) == "table" then
@@ -223,29 +208,54 @@ function AnnotationSyncPlugin:onAnnotationsModified(payload)
     local document = self.ui and self.ui.document
     if document and document.file then
         local changed_file = document.file
-        print("Document changed: " .. changed_file)
-        -- Track in a Lua file in the user data directory
-        local data_dir = DataStorage:getDataDir()
-        local track_path = data_dir .. "/changed_documents.lua"
-        -- Load existing table or create new
-        local changed_docs = {}
-        local ok, loaded = pcall(dofile, track_path)
-        if ok and type(loaded) == "table" then
-            changed_docs = loaded
-        end
-        changed_docs[changed_file] = true
-        -- Write table to file
-        local f = io.open(track_path, "w")
-        if f then
-            f:write("return ", serialize_table(changed_docs), "\n")
-            f:close()
-        else
-            print("Failed to open track file: " .. track_path)
-        end
+        logger.dbg("AnnotationSync: Document annotations modified: " .. changed_file)
+        self:addToChangedDocumentsFile(document)
     else
-        print("Document change detected, but no document context available.")
+        logger.warn("AnnotationSync: Document annotations modification detected, but no document context available.")
     end
 end
+
+-- Lua file in the user data directory to track changed documents
+function AnnotationSyncPlugin:changedDocumentsFile()
+    return DataStorage:getDataDir() .. "/changed_documents.lua"
+end
+
+function AnnotationSyncPlugin:addToChangedDocumentsFile(document)
+    local file = document and document.file
+    local track_path = self:changedDocumentsFile()
+    -- Load existing table or create new
+    local changed_docs = {}
+    local ok, loaded = pcall(dofile, track_path)
+    if ok and type(loaded) == "table" then
+        changed_docs = loaded
+    end
+    if file then
+        changed_docs[file] = true
+        self:writeChangedDocumentsFile(changed_docs)
+    end
+end
+
+function AnnotationSyncPlugin:removeFromChangedDocumentsFile(document)
+    local file = document and document.file
+    local track_path = self:changedDocumentsFile()
+    local ok, changed_docs = pcall(dofile, track_path)
+    if ok and type(changed_docs) == "table" and changed_docs[file] then
+        changed_docs[file] = nil
+        self:writeChangedDocumentsFile(changed_docs)
+    end
+end
+
+function AnnotationSyncPlugin:writeChangedDocumentsFile(changed_docs)
+    local track_path = self:changedDocumentsFile()
+    local f = io.open(track_path, "w")
+    if f then
+        f:write("return ", serialize_table(changed_docs), "\n")
+        f:close()
+    else
+        logger.warn("AnnotationSync: Failed to open changed documents file: " .. track_path)
+    end
+end
+
 
 -- Helper to serialize a Lua table as code
 function serialize_table(tbl)
