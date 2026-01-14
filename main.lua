@@ -86,9 +86,6 @@ function AnnotationSyncPlugin:syncAllChangedDocuments()
     for file, _ in pairs(changed_docs) do
         -- Try to get a document object for this file, open if needed
         local document = self:getDocumentByFile(file)
-        if not document then
-            document = DocumentRegistry:openDocument(file)
-        end
         if document then
             self:syncDocument(document)
             count = count + 1
@@ -132,7 +129,7 @@ function AnnotationSyncPlugin:getDocumentByFile(file)
     if document and document.file == file then
         return document
     end
-    return nil
+    return DocumentRegistry:openDocument(file)
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncManualSync()
