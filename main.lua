@@ -72,14 +72,12 @@ end
 
 -- Sync all changed documents listed in changed_documents.lua
 function AnnotationSyncPlugin:syncAllChangedDocuments()
+    local total = 0
     local track_path = self:changedDocumentsFile()
     local ok, changed_docs = pcall(dofile, track_path)
-    if not ok or type(changed_docs) ~= "table" then
-        utils.show_msg("No changed documents to sync.")
-        return
+    if ok and type(changed_docs) == "table" then
+        for _ in pairs(changed_docs) do total = total + 1 end
     end
-    local total = 0
-    for _ in pairs(changed_docs) do total = total + 1 end
     if total == 0 then
         utils.show_msg("No changed documents to sync.")
         return
