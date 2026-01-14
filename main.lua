@@ -2,6 +2,8 @@ local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
+local LuaSettings = require("luasettings")
+local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
 local SyncService = require("apps/cloudstorage/syncservice")
@@ -105,7 +107,9 @@ function AnnotationSyncPlugin:syncDocument(document)
     local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then return end
-    local stored_annotations = document.annotation and document.annotation.annotations or {}
+
+    local stored_annotations = self:getAnnotationsForDocument(document)
+
     local annotation_filename
     if use_filename then
         local filename = file:match("([^/]+)$") or file
@@ -208,6 +212,18 @@ function AnnotationSyncPlugin:onAnnotationsModified(payload)
     else
         logger.warn("AnnotationSync: Document annotations modification detected, but no document context available.")
     end
+end
+
+-- Get annotations associated with given document
+function AnnotationSyncPlugin:getAnnotationsForDocument(document)
+    -- Handle active document
+    if document == self.ui.document and self.ui.annotation and self.ui.annotation.annotations then
+        return self.ui.annotation.annotations
+    end
+    -- Handle inactive document
+    local anotation_reader = ReaderAnnotation:new{ document = document }
+    local annotation_sidecar = LuaSettings:open(anotation_reader:getExportAnnotationsFilepath())
+    return annotation_sidecar:readSetting("annotations") or {}
 end
 
 -- Lua file in the user data directory to track changed documents
