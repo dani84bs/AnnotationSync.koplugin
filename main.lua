@@ -2,6 +2,7 @@ local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
+local InfoMessage = require("ui/widget/infomessage")
 local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -139,6 +140,15 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 text_func = function()
                    return T(_("Last sync: %1"), self.settings.last_sync)
                 end
+            },
+            {
+                text = T(_("Plugin version: %1"), self.version),
+                keep_menu_open = true,
+                callback = function()
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("%1 (%4)\nVersion: %2\n\n%3"), self.fullname, self.version, self.description, self.plugin_id),
+                    })
+                end,
             },
         }
     }
