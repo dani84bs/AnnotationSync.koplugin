@@ -30,6 +30,7 @@ local AnnotationSyncPlugin = WidgetContainer:extend {
 AnnotationSyncPlugin.default_settings = {
     last_sync = "Never",
     use_filename= false,
+    network_auto_sync = false,
 }
 
 function AnnotationSyncPlugin:init()
@@ -43,6 +44,26 @@ function AnnotationSyncPlugin:init()
     if G_reader_settings:has("annotation_sync_use_filename") then
         self.settings.use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
         G_reader_settings:delSetting("annotation_sync_use_filename")
+    end
+
+    self:registerEvents()
+end
+
+function AnnotationSyncPlugin:registerEvents()
+    if self.settings.network_auto_sync then
+        self.onNetworkConnected = self._onNetworkConnected
+    else
+        self.onNetworkConnected = nil
+    end
+end
+
+function AnnotationSyncPlugin:_onNetworkConnected()
+    logger.dbg("AnnotationSync: handling event: NetworkConnected")
+    if self:hasPendingChangedDocuments() then
+        utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
+        UIManager:scheduleIn(1, function()
+            self:syncAllChangedDocuments()
+        end)
     end
 end
 
@@ -72,6 +93,20 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                         callback = function()
                             local current = self.settings.use_filename
                             self.settings.use_filename = not current
+                            UIManager:close()
+                        end
+                    },
+                    {
+                        text = _("Automatically Sync All when network becomes available"),
+                        checked_func = function()
+                            return self.settings.network_auto_sync
+                        end,
+                        callback = function()
+                            local current = self.settings.network_auto_sync
+                            self.settings.network_auto_sync = not current
+                            if self.settings.network_auto_sync then
+                                self:registerEvents()
+                            end
                             UIManager:close()
                         end
                     },
