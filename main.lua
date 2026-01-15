@@ -23,13 +23,26 @@ local sync_all_description = "Sync annotations and bookmarks of all unsynced doc
 local AnnotationSyncPlugin = WidgetContainer:extend {
     -- see also: _meta.lua
     is_doc_only = false,
-    _changed_documents = {}, -- Track changed documents
+
+    settings = nil,
+}
+
+AnnotationSyncPlugin.default_settings = {
+    use_filename= false,
 }
 
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
     utils.insert_after_statistics(self.plugin_id)
     self:onDispatcherRegisterActions()
+
+    self.settings = G_reader_settings:readSetting(self.plugin_id, self.default_settings)
+
+    -- Migrate old annotation_sync_use_filename setting
+    if G_reader_settings:has("annotation_sync_use_filename") then
+        self.settings.use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
+        G_reader_settings:delSetting("annotation_sync_use_filename")
+    end
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
@@ -124,14 +137,13 @@ function AnnotationSyncPlugin:syncDocument(document)
     local file = document and document.file
     if not file then return end
     logger.dbg("AnnotationSync: syncing document: " .. file)
-    local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then return end
 
     local stored_annotations = self:getAnnotationsForDocument(document)
 
     local annotation_filename
-    if use_filename then
+    if self.settings.use_filename then
         local filename = file:match("([^/]+)$") or file
         annotation_filename = filename .. ".json"
     else
