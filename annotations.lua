@@ -4,6 +4,8 @@ local json = require("json")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
 
+local logger = require("logger")
+
 local M = {}
 
 function M.flush_metadata(document, stored_annotations)

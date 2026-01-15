@@ -113,6 +113,7 @@ end
 function AnnotationSyncPlugin:syncDocument(document)
     local file = document and document.file
     if not file then return end
+    logger.dbg("AnnotationSync: syncing document: " .. file)
     local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then return end
@@ -142,7 +143,13 @@ function AnnotationSyncPlugin:getDocumentByFile(file)
     if document and document.file == file then
         return document
     end
-    return DocumentRegistry:openDocument(file)
+    document = DocumentRegistry:openDocument(file)
+    -- crengine documents must be rendered in order to use their XPointer functions
+    if document.provider == "crengine" then
+        logger.dbg("AnnotationSync: rendering: " .. file)
+        document:render()
+    end
+    return document
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncSyncAll()
