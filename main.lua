@@ -21,14 +21,14 @@ local manual_sync_description = "Sync annotations and bookmarks of the active do
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
 
 local AnnotationSyncPlugin = WidgetContainer:extend {
-    name = "AnnotationSync",
+    -- see also: _meta.lua
     is_doc_only = false,
     _changed_documents = {}, -- Track changed documents
 }
 
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
-    utils.insert_after_statistics("annotation_sync_plugin")
+    utils.insert_after_statistics(self.plugin_id)
     self:onDispatcherRegisterActions()
 end
 
