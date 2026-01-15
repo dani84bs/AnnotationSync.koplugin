@@ -4,22 +4,12 @@ local json = require("json")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
 
+local logger = require("logger")
+
 local M = {}
 
 function M.flush_metadata(document, stored_annotations)
-    if document and document.file then
-        local ds = docsettings:open(document.file)
-        if ds and type(ds.flush) == "function" then
-            pcall(function()
-                ds:flush()
-            end)
-        end
-        if ds and type(ds.close) == "function" then
-            pcall(function()
-                ds:close()
-            end)
-        end
-    end
+    UIManager:broadcastEvent(Event:new("FlushSettings"))
 end
 
 function M.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
@@ -178,11 +168,13 @@ local function is_before(a, b)
 end
 
 
-function M.sync_callback(widget, local_file, last_sync_file, income_file)
+function M.sync_callback(widget, document, local_file, last_sync_file, income_file)
+    logger.dbg("AnnotationSync:sync_callback: local_file: " .. local_file)
+    logger.dbg("AnnotationSync:sync_callback: last_sync_file: " .. last_sync_file)
+    logger.dbg("AnnotationSync:sync_callback: income_file: " .. income_file)
     local local_map = utils.read_json(local_file)
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
-    local document = widget.ui.document
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, last_sync_map, document)
     local merged = {}
@@ -192,6 +184,7 @@ function M.sync_callback(widget, local_file, last_sync_file, income_file)
     local l = 1
     local i = 1
 
+    logger.dbg("AnnotationSync:sync_callback: comparing income and local")
     while i <= #income_keys and l <= #local_keys do
         local income_k = income_keys[i]
         local local_k = local_keys[l]
@@ -233,6 +226,7 @@ function M.sync_callback(widget, local_file, last_sync_file, income_file)
         i = i + 1
     end
 
+    logger.dbg("AnnotationSync:sync_callback: handling active")
     if widget and widget.ui and widget.ui.annotation then
         local merged_list = M.map_to_list(merged)
         table.sort(merged_list, function(a, b)
