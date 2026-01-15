@@ -28,6 +28,7 @@ local AnnotationSyncPlugin = WidgetContainer:extend {
 }
 
 AnnotationSyncPlugin.default_settings = {
+    last_sync = "Never",
     use_filename= false,
 }
 
@@ -98,6 +99,12 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end,
                 separator = true,
             },
+            {
+                enabled = false,
+                text_func = function()
+                   return T(_("Last sync: %1"), self.settings.last_sync)
+                end
+            },
         }
     }
 
@@ -137,8 +144,18 @@ function AnnotationSyncPlugin:syncAllChangedDocuments()
     if count == 0 then
         utils.show_msg("Unable to sync modified documents: " .. total)
     else
+        self:updateLastSync("Sync All")
         utils.show_msg("Successfully synced modified documents: " .. count)
     end
+end
+
+function AnnotationSyncPlugin:updateLastSync(descriptor)
+    local parenthetical = ""
+    if descriptor and type(descriptor) == "string" then
+        parenthetical = " (" .. descriptor .. ")"
+    end
+    self.settings.last_sync = os.date("%Y-%m-%d %H:%M:%S") .. parenthetical
+    logger.dbg("AnnotationSync: updateLastSync: updated at " .. self.settings.last_sync)
 end
 
 -- Helper to sync a document (same as manualSync but for a given document)
@@ -227,6 +244,7 @@ function AnnotationSyncPlugin:manualSync()
         utils.show_msg("A document must be active to do a manual sync.")
         return
     end
+    self:updateLastSync("Manual Sync")
     self:syncDocument(document)
 end
 
