@@ -49,47 +49,56 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
     menu_items.annotation_sync_plugin = {
         text = _("Annotation Sync"),
         sorting_hint = "tools",
-        sub_item_table = { {
-            text = _("Settings"),
-            sub_item_table = { {
-                text = _("Cloud settings"),
-                callback = function()
-                    local sync_service = SyncService:new {}
-                    sync_service.onConfirm = function(server)
-                        self:onSyncServiceConfirm(server)
-                    end
-                    UIManager:show(sync_service)
-                end
-            }, {
-                text = _("Use filename instead of hash"),
-                checked_func = function()
-                    return G_reader_settings:isTrue("annotation_sync_use_filename")
+        sub_item_table = {
+            {
+                text = _("Settings"),
+                sub_item_table = {
+                    {
+                        text = _("Cloud settings"),
+                        callback = function()
+                            local sync_service = SyncService:new {}
+                            sync_service.onConfirm = function(server)
+                                self:onSyncServiceConfirm(server)
+                            end
+                            UIManager:show(sync_service)
+                        end
+                    },
+                    {
+                        text = _("Use filename instead of hash"),
+                        checked_func = function()
+                            return self.settings.use_filename
+                        end,
+                        callback = function()
+                            local current = self.settings.use_filename
+                            self.settings.use_filename = not current
+                            UIManager:close()
+                        end
+                    },
+                },
+                separator = true,
+            },
+            {
+                text = _("Manual Sync"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
+                hold_callback = function()
+                    utils.show_msg(manual_sync_description)
                 end,
                 callback = function()
-                    local current = G_reader_settings:isTrue("annotation_sync_use_filename")
-                    G_reader_settings:saveSetting("annotation_sync_use_filename", not current)
-                    UIManager:close()
+                    self:manualSync()
                 end
-            } }
-        }, {
-            text = _("Manual Sync"),
-            enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
-            hold_callback = function()
-                utils.show_msg(manual_sync_description)
-            end,
-            callback = function()
-                self:manualSync()
-            end
-        }, {
-            text = _("Sync All"),
-            enabled = true,
-            hold_callback = function()
-                utils.show_msg(sync_all_description)
-            end,
-            callback = function()
-                self:syncAllChangedDocuments()
-            end
-        } }
+            },
+            {
+                text = _("Sync All"),
+                enabled = true,
+                hold_callback = function()
+                    utils.show_msg(sync_all_description)
+                end,
+                callback = function()
+                    self:syncAllChangedDocuments()
+                end,
+                separator = true,
+            },
+        }
     }
 
 end
