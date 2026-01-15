@@ -213,7 +213,8 @@ function AnnotationSyncPlugin:getAnnotationsForDocument(document)
     -- Handle inactive document
     local anotation_reader = ReaderAnnotation:new{ document = document }
     local annotation_sidecar = LuaSettings:open(anotation_reader:getExportAnnotationsFilepath())
-    return annotation_sidecar:readSetting("annotations") or {}
+    local result = annotation_sidecar:readSetting("annotations")
+    return result or {}
 end
 
 -- Lua file in the user data directory to track changed documents
