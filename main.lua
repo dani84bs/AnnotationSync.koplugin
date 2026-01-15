@@ -81,14 +81,24 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
 
 end
 
--- Sync all changed documents listed in changed_documents.lua
-function AnnotationSyncPlugin:syncAllChangedDocuments()
-    local total = 0
+function AnnotationSyncPlugin:hasPendingChangedDocuments()
+    local count, _ = self:getPendingChangedDocuments()
+    return count > 0
+end
+
+function AnnotationSyncPlugin:getPendingChangedDocuments()
+    local count = 0
     local track_path = self:changedDocumentsFile()
     local ok, changed_docs = pcall(dofile, track_path)
     if ok and type(changed_docs) == "table" then
-        for _ in pairs(changed_docs) do total = total + 1 end
+        for _ in pairs(changed_docs) do count = count + 1 end
     end
+    return count, changed_docs
+end
+
+-- Sync all changed documents listed in changed_documents.lua
+function AnnotationSyncPlugin:syncAllChangedDocuments()
+    local total, changed_docs = self:getPendingChangedDocuments()
     if total == 0 then
         utils.show_msg("No changed documents to sync.")
         return
