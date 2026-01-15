@@ -130,7 +130,8 @@ function AnnotationSyncPlugin:syncDocument(document)
     end
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
-    remote.sync_annotations(self, json_path)
+    logger.dbg("AnnotationSync: remote sync of " .. json_path)
+    remote.sync_annotations(self, document, json_path)
     -- Remove from changed_documents.lua if present (very last action)
     self:removeFromChangedDocumentsFile(document)
 end
