@@ -293,16 +293,23 @@ function AnnotationSyncPlugin:manualSync()
     self:syncDocument(document)
 end
 
-
-function AnnotationSyncPlugin:onAnnotationsModified(payload)
-    -- Try to get the document from the UI context
-    local document = self.ui and self.ui.document
-    if document and document.file then
-        local changed_file = document.file
+function AnnotationSyncPlugin:onAnnotationsModified(annotations)
+    if not annotations and type(annotations) == "table" then
+        logger.warn("AnnotationSync: Document annotations modification detected, but could not process provided annotations payload (of type: " .. type(annotations) .. ")")
+        return
+    end
+    for _, annotation in ipairs(annotations) do
+        local changed_file = annotation.book_path
+        -- AnnotationsModified event payload does not include book_path for an active document
+        if not changed_file then
+            changed_file = self.ui and self.ui.document and self.ui.document.file
+        end
+        if not changed_file then
+            logger.warn("AnnotationSync: Document annotations modification detected, but could not determine changed file")
+            break
+        end
         logger.dbg("AnnotationSync: Document annotations modified: " .. changed_file)
-        self:addToChangedDocumentsFile(document)
-    else
-        logger.warn("AnnotationSync: Document annotations modification detected, but no document context available.")
+        self:addToChangedDocumentsFile(changed_file)
     end
 end
 
@@ -324,8 +331,7 @@ function AnnotationSyncPlugin:changedDocumentsFile()
     return DataStorage:getDataDir() .. "/changed_documents.lua"
 end
 
-function AnnotationSyncPlugin:addToChangedDocumentsFile(document)
-    local file = document and document.file
+function AnnotationSyncPlugin:addToChangedDocumentsFile(file)
     local track_path = self:changedDocumentsFile()
     -- Load existing table or create new
     local changed_docs = {}
@@ -333,7 +339,7 @@ function AnnotationSyncPlugin:addToChangedDocumentsFile(document)
     if ok and type(loaded) == "table" then
         changed_docs = loaded
     end
-    if file then
+    if file and type(file) == "string" then
         changed_docs[file] = true
         self:writeChangedDocumentsFile(changed_docs)
     end
