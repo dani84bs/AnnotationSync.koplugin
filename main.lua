@@ -2,6 +2,7 @@ local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
+local InfoMessage = require("ui/widget/infomessage")
 local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -21,74 +22,157 @@ local manual_sync_description = "Sync annotations and bookmarks of the active do
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
 
 local AnnotationSyncPlugin = WidgetContainer:extend {
-    name = "AnnotationSync",
+    -- see also: _meta.lua
     is_doc_only = false,
-    _changed_documents = {}, -- Track changed documents
+
+    settings = nil,
+}
+
+AnnotationSyncPlugin.default_settings = {
+    last_sync = "Never",
+    use_filename= false,
+    network_auto_sync = false,
 }
 
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
-    utils.insert_after_statistics("annotation_sync_plugin")
+    utils.insert_after_statistics(self.plugin_id)
     self:onDispatcherRegisterActions()
+
+    self.settings = G_reader_settings:readSetting(self.plugin_id, self.default_settings)
+
+    -- Migrate old annotation_sync_use_filename setting
+    if G_reader_settings:has("annotation_sync_use_filename") then
+        self.settings.use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
+        G_reader_settings:delSetting("annotation_sync_use_filename")
+    end
+
+    self:registerEvents()
+end
+
+function AnnotationSyncPlugin:registerEvents()
+    if self.settings.network_auto_sync then
+        self.onNetworkConnected = self._onNetworkConnected
+    else
+        self.onNetworkConnected = nil
+    end
+end
+
+function AnnotationSyncPlugin:_onNetworkConnected()
+    logger.dbg("AnnotationSync: handling event: NetworkConnected")
+    if self:hasPendingChangedDocuments() then
+        utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
+        UIManager:scheduleIn(1, function()
+            self:syncAllChangedDocuments()
+        end)
+    end
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
     menu_items.annotation_sync_plugin = {
         text = _("Annotation Sync"),
         sorting_hint = "tools",
-        sub_item_table = { {
-            text = _("Settings"),
-            sub_item_table = { {
-                text = _("Cloud settings"),
-                callback = function()
-                    local sync_service = SyncService:new {}
-                    sync_service.onConfirm = function(server)
-                        self:onSyncServiceConfirm(server)
-                    end
-                    UIManager:show(sync_service)
-                end
-            }, {
-                text = _("Use filename instead of hash"),
-                checked_func = function()
-                    return G_reader_settings:isTrue("annotation_sync_use_filename")
+        sub_item_table = {
+            {
+                text = _("Settings"),
+                sub_item_table = {
+                    {
+                        text = _("Cloud settings"),
+                        callback = function()
+                            local sync_service = SyncService:new {}
+                            sync_service.onConfirm = function(server)
+                                self:onSyncServiceConfirm(server)
+                            end
+                            UIManager:show(sync_service)
+                        end
+                    },
+                    {
+                        text = _("Use filename instead of hash"),
+                        checked_func = function()
+                            return self.settings.use_filename
+                        end,
+                        callback = function()
+                            local current = self.settings.use_filename
+                            self.settings.use_filename = not current
+                            UIManager:close()
+                        end
+                    },
+                    {
+                        text = _("Automatically Sync All when network becomes available"),
+                        checked_func = function()
+                            return self.settings.network_auto_sync
+                        end,
+                        callback = function()
+                            local current = self.settings.network_auto_sync
+                            self.settings.network_auto_sync = not current
+                            if self.settings.network_auto_sync then
+                                self:registerEvents()
+                            end
+                            UIManager:close()
+                        end
+                    },
+                },
+                separator = true,
+            },
+            {
+                text = _("Manual Sync"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
+                hold_callback = function()
+                    utils.show_msg(manual_sync_description)
                 end,
                 callback = function()
-                    local current = G_reader_settings:isTrue("annotation_sync_use_filename")
-                    G_reader_settings:saveSetting("annotation_sync_use_filename", not current)
-                    UIManager:close()
+                    self:manualSync()
                 end
-            } }
-        }, {
-            text = _("Manual Sync"),
-            enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
-            hold_callback = function()
-                utils.show_msg(manual_sync_description)
-            end,
-            callback = function()
-                self:manualSync()
-            end
-        }, {
-            text = _("Sync All"),
-            enabled = true,
-            hold_callback = function()
-                utils.show_msg(sync_all_description)
-            end,
-            callback = function()
-                self:syncAllChangedDocuments()
-            end
-        } }
+            },
+            {
+                text = _("Sync All"),
+                enabled = true,
+                hold_callback = function()
+                    utils.show_msg(sync_all_description)
+                end,
+                callback = function()
+                    self:syncAllChangedDocuments()
+                end,
+                separator = true,
+            },
+            {
+                enabled = false,
+                text_func = function()
+                   return T(_("Last sync: %1"), self.settings.last_sync)
+                end
+            },
+            {
+                text = T(_("Plugin version: %1"), self.version),
+                keep_menu_open = true,
+                callback = function()
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("%1 (%4)\nVersion: %2\n\n%3"), self.fullname, self.version, self.description, self.plugin_id),
+                    })
+                end,
+            },
+        }
     }
 
 end
 
--- Sync all changed documents listed in changed_documents.lua
-function AnnotationSyncPlugin:syncAllChangedDocuments()
-    local total = 0
+function AnnotationSyncPlugin:hasPendingChangedDocuments()
+    local count, _ = self:getPendingChangedDocuments()
+    return count > 0
+end
+
+function AnnotationSyncPlugin:getPendingChangedDocuments()
+    local count = 0
     local track_path = self:changedDocumentsFile()
     local ok, changed_docs = pcall(dofile, track_path)
     if ok and type(changed_docs) == "table" then
-        for _ in pairs(changed_docs) do total = total + 1 end
+        for _ in pairs(changed_docs) do count = count + 1 end
     end
+    return count, changed_docs
+end
+
+-- Sync all changed documents listed in changed_documents.lua
+function AnnotationSyncPlugin:syncAllChangedDocuments()
+    local total, changed_docs = self:getPendingChangedDocuments()
     if total == 0 then
         utils.show_msg("No changed documents to sync.")
         return
@@ -105,8 +189,18 @@ function AnnotationSyncPlugin:syncAllChangedDocuments()
     if count == 0 then
         utils.show_msg("Unable to sync modified documents: " .. total)
     else
+        self:updateLastSync("Sync All")
         utils.show_msg("Successfully synced modified documents: " .. count)
     end
+end
+
+function AnnotationSyncPlugin:updateLastSync(descriptor)
+    local parenthetical = ""
+    if descriptor and type(descriptor) == "string" then
+        parenthetical = " (" .. descriptor .. ")"
+    end
+    self.settings.last_sync = os.date("%Y-%m-%d %H:%M:%S") .. parenthetical
+    logger.dbg("AnnotationSync: updateLastSync: updated at " .. self.settings.last_sync)
 end
 
 -- Helper to sync a document (same as manualSync but for a given document)
@@ -114,14 +208,13 @@ function AnnotationSyncPlugin:syncDocument(document)
     local file = document and document.file
     if not file then return end
     logger.dbg("AnnotationSync: syncing document: " .. file)
-    local use_filename = G_reader_settings:isTrue("annotation_sync_use_filename")
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then return end
 
     local stored_annotations = self:getAnnotationsForDocument(document)
 
     local annotation_filename
-    if use_filename then
+    if self.settings.use_filename then
         local filename = file:match("([^/]+)$") or file
         annotation_filename = filename .. ".json"
     else
@@ -196,6 +289,7 @@ function AnnotationSyncPlugin:manualSync()
         utils.show_msg("A document must be active to do a manual sync.")
         return
     end
+    self:updateLastSync("Manual Sync")
     self:syncDocument(document)
 end
 
