@@ -172,6 +172,7 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
     logger.dbg("AnnotationSync:sync_callback: local_file: " .. local_file)
     logger.dbg("AnnotationSync:sync_callback: last_sync_file: " .. last_sync_file)
     logger.dbg("AnnotationSync:sync_callback: income_file: " .. income_file)
+    
     local local_map = utils.read_json(local_file)
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
@@ -227,8 +228,8 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
     end
 
     logger.dbg("AnnotationSync:sync_callback: handling active")
-    if widget and widget.ui and widget.ui.annotation then
-        local merged_list = M.map_to_list(merged)
+    local merged_list = M.map_to_list(merged)
+    if widget and widget.ui and widget.ui.annotation and widget.ui.document == document then
         table.sort(merged_list, function(a, b)
             return compare_positions(a.page, b.page, widget.ui.document) > 0
         end)
@@ -242,6 +243,11 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
             widget.ui.view:recalculate()
             UIManager:setDirty(widget.ui.view.dialog, "partial")
         end
+    else
+        -- Update sidecar directly for inactive document or when no UI is present
+        local annotation_sidecar = docsettings:open(document.file)
+        annotation_sidecar:saveSetting("annotations", merged_list)
+        annotation_sidecar:flush()
     end
 
     local f = io.open(local_file, "w")
