@@ -139,6 +139,14 @@ function M.get_deleted_annotations(local_map, last_uploaded_map, document)
         local local_keys = sort_keys_by_position(local_map, document)
         local uploaded_keys = sort_keys_by_position(last_uploaded_map, document)
 
+        -- SAFETY (Issue 23): If local is empty but last sync was not, 
+        -- it's likely a docsettings failure or fresh device state.
+        -- We skip deletion propagation to avoid wiping remote data.
+        if #local_keys == 0 and #uploaded_keys > 0 then
+            logger.warn("AnnotationSync: Local annotations empty but last sync had " .. #uploaded_keys .. ". Skipping deletions to protect data.")
+            return
+        end
+
         for _, uploaded_k in ipairs(uploaded_keys) do
             local uploaded_v = last_uploaded_map[uploaded_k]
             local local_and_uploaded = false

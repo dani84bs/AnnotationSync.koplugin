@@ -9,18 +9,25 @@ local annotations = require("annotations")
 
 local M = {}
 
-function M.sync_annotations(widget, document, json_path)
+function M.sync_annotations(widget, document, json_path, on_complete)
     local server_json = G_reader_settings:readSetting("cloud_server_object")
     if server_json and server_json ~= "" then
         local server = json.decode(server_json)
         SyncService.sync(server, json_path, function(local_file, cached_file, income_file)
-            return annotations.sync_callback(widget, document, local_file, cached_file, income_file)
+            local success = annotations.sync_callback(widget, document, local_file, cached_file, income_file)
+            if on_complete then
+                on_complete(success)
+            end
+            return success
         end, false)
     else
         UIManager:show(InfoMessage:new {
             text = T(_("No cloud destination set in settings.")),
             timeout = 4
         })
+        if on_complete then
+            on_complete(false)
+        end
     end
 end
 

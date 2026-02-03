@@ -58,14 +58,16 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
             sync_instance:addToChangedDocumentsFile(readerui.document.file)
             assert.is_true(sync_instance:hasPendingChangedDocuments())
 
+            -- Mock SyncService.sync to simulate a failure (callback never called)
             SyncService.sync = function(server, local_path, sync_cb, is_silent)
+                -- Failure: callback is not called
                 return 
             end
 
             sync_instance:manualSync()
 
-            -- NOTE: Current implementation BUG: it removes from changed list anyway.
-            assert.is_false(sync_instance:hasPendingChangedDocuments())
+            -- Fixed: It should now remain dirty because the callback (which triggers removal) was never called
+            assert.is_true(sync_instance:hasPendingChangedDocuments())
         end)
 
         it("should handle malformed remote data gracefully", function()

@@ -1,5 +1,5 @@
 describe("AnnotationSync Sync Protection & Regressions", function()
-    local ReaderUI, UIManager, Geom
+    local ReaderUI, UIManager, Geom, SyncService
     local AnnotationSyncPlugin, highlight_db, test_utils, json
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_protection_tmp"
@@ -14,6 +14,7 @@ describe("AnnotationSync Sync Protection & Regressions", function()
         Geom = require("ui/geometry")
         ReaderUI = require("apps/reader/readerui")
         UIManager = require("ui/uimanager")
+        SyncService = require("apps/cloudstorage/syncservice")
         json = require("json")
         
         highlight_db = require("spec/unit/highlight_db")
@@ -50,13 +51,13 @@ describe("AnnotationSync Sync Protection & Regressions", function()
         
         -- 3. Mock sync to check what's being sent
         local last_uploaded_data
-        local SyncService = require("apps/cloudstorage/syncservice")
         local old_sync = SyncService.sync
         SyncService.sync = function(server, local_path, callback, upload_only)
-            callback(local_path, local_path, local_path)
+            local result = callback(local_path, local_path, local_path)
             local f = io.open(local_path, "r")
             last_uploaded_data = json.decode(f:read("*all"))
             f:close()
+            return result
         end
 
         G_reader_settings:saveSetting("cloud_download_dir", "mock")
@@ -76,7 +77,6 @@ describe("AnnotationSync Sync Protection & Regressions", function()
     end)
 
     it("should read annotations from DocSettings directly (Regression Issue 23)", function()
-        -- Mock docsettings module in package.loaded
         local mock_ds = {
             open = function(this, file)
                 return {
@@ -88,13 +88,14 @@ describe("AnnotationSync Sync Protection & Regressions", function()
                 }
             end
         }
-        local old_fds = package.loaded["frontend/docsettings"]
-        local old_ds = package.loaded["docsettings"]
-        
+        -- Monkey patch the instance directly if possible, or use package.loaded
+        local old_ds_module = package.loaded["frontend/docsettings"]
         package.loaded["frontend/docsettings"] = mock_ds
-        package.loaded["docsettings"] = mock_ds
-
-        -- We must reload the plugin to pick up the mocked docsettings
+        
+        -- We need to ensure sync_instance uses the mock. 
+        -- In main.lua it does: local ds = require("frontend/docsettings")
+        -- Since we already initialized sync_instance, it might have captured the old one.
+        -- Let's reload the plugin for this specific test to be sure.
         package.loaded["main"] = nil
         local MockPlugin = require("main")
         local mock_instance = MockPlugin:new{ ui = readerui, plugin_id = "test" }
@@ -103,7 +104,23 @@ describe("AnnotationSync Sync Protection & Regressions", function()
         assert.is_equal(1, #result)
         assert.is_equal("test_page", result[1].page)
 
-        package.loaded["frontend/docsettings"] = old_fds
-        package.loaded["docsettings"] = old_ds
+        package.loaded["frontend/docsettings"] = old_ds_module
+    end)
+
+    it("should skip deletions if local map is empty but last sync was not (Issue 23 Protection)", function()
+        local annotations_mod = require("annotations")
+        local local_map = {} -- EMPTY
+        local last_sync_map = {
+            ["p1|p2"] = { pos0 = "p1", pos1 = "p2", text = "Gone?" }
+        }
+        local mock_doc = {
+            compareXPointers = function() return 0 end
+        }
+
+        -- This should NOT mark anything as deleted because local_map is empty
+        annotations_mod.get_deleted_annotations(local_map, last_sync_map, mock_doc)
+
+        assert.is_equal(0, #annotations_mod.map_to_list(local_map))
+        assert.is_nil(local_map["p1|p2"])
     end)
 end)

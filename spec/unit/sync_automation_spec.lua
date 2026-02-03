@@ -46,6 +46,7 @@ describe("AnnotationSync Automation & Settings", function()
         fastforward_ui_events()
         readerui.annotation.annotations = {}
         os.remove(sync_instance:changedDocumentsFile())
+        test_utils.mock_sync_service(SyncService)
     end)
 
     describe("Settings", function()
@@ -55,7 +56,7 @@ describe("AnnotationSync Automation & Settings", function()
             local captured_path
             SyncService.sync = function(server, local_path, callback, upload_only)
                 captured_path = local_path
-                callback(local_path, local_path, local_path)
+                return callback(local_path, local_path, local_path)
             end
 
             sync_instance.settings.use_filename = false

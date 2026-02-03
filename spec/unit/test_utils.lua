@@ -69,6 +69,21 @@ function M.emulate_highlight(readerui, entry)
     return readerui.highlight:saveHighlight()
 end
 
+function M.mock_sync_service(SyncService)
+    local old_sync = SyncService.sync
+    SyncService.sync = function(server, local_path, callback, upload_only)
+        local ok, result = pcall(callback, local_path, local_path, local_path)
+        if not ok then
+            error("Sync callback CRASHED: " .. tostring(result))
+        end
+        if not result then
+            error("Sync callback contract violation: function returned nil/false instead of true. " ..
+                  "This triggers 'Something went wrong' in production.")
+        end
+    end
+    return old_sync
+end
+
 function M.write_mock_json(test_data_dir, filename, data)
     local path = test_data_dir .. "/" .. filename
     local f = io.open(path, "w")

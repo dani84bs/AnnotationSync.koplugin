@@ -50,9 +50,7 @@ describe("AnnotationSync Core Integration", function()
         sync_instance.settings.use_filename = true
         os.remove(sync_instance:changedDocumentsFile())
         
-        SyncService.sync = function(server, local_path, callback, upload_only)
-            callback(local_path, local_path, local_path)
-        end
+        test_utils.mock_sync_service(SyncService)
     end)
 
     local function create_ann_from_db(index, note, datetime)
