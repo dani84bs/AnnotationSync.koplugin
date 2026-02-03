@@ -224,9 +224,14 @@ function AnnotationSyncPlugin:syncDocument(document)
     local json_path = sdr_dir .. "/" .. annotation_filename
     annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
     logger.dbg("AnnotationSync: remote sync of " .. json_path)
-    remote.sync_annotations(self, document, json_path)
-    -- Remove from changed_documents.lua if present (very last action)
-    self:removeFromChangedDocumentsFile(document)
+    remote.sync_annotations(self, document, json_path, function(success)
+        if success then
+            -- Remove from changed_documents.lua if present (only on success)
+            self:removeFromChangedDocumentsFile(document)
+        else
+            logger.warn("AnnotationSync: sync failed for " .. file .. ", keeping in changed list")
+        end
+    end)
 end
 
 -- Helper to get a document object by file path (stub, needs integration with document management)
@@ -320,8 +325,7 @@ function AnnotationSyncPlugin:getAnnotationsForDocument(document)
         return self.ui.annotation.annotations
     end
     -- Handle inactive document
-    local anotation_reader = ReaderAnnotation:new{ document = document }
-    local annotation_sidecar = LuaSettings:open(anotation_reader:getExportAnnotationsFilepath())
+    local annotation_sidecar = docsettings:open(document.file)
     local result = annotation_sidecar:readSetting("annotations")
     return result or {}
 end
