@@ -1,0 +1,55 @@
+name: AnnotationSync Plugin Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: "Run AnnotationSync Integration Tests"
+    runs-on: ubuntu-latest
+    container:
+      image: koreader/kobase:0.5.3-22.04
+
+    env:
+      KODEBUG: "1"
+      MAKEFLAGS: OUTPUT_DIR=build PARALLEL_JOBS=4 INSTALL_DIR=install
+      EMULATE_READER: "1"
+
+    steps:
+      - name: Checkout KOReader Core
+        uses: actions/checkout@v4
+        with:
+          repository: koreader/koreader
+          path: koreader_core
+          fetch-depth: 0
+
+      - name: Checkout AnnotationSync Plugin
+        uses: actions/checkout@v4
+        with:
+          path: koreader_core/plugins/AnnotationSync.koplugin
+
+      - name: Fetch Thirdparty
+        run: |
+          cd koreader_core
+          git config --global --add safe.directory /__w/AnnotationSync/AnnotationSync/koreader_core
+          make fetchthirdparty
+
+      - name: Build Base (Needed for tests)
+        run: |
+          cd koreader_core
+          make base
+
+      - name: Run AnnotationSync Tests
+        run: |
+          cd koreader_core/plugins/AnnotationSync.koplugin
+          ./run_tests.sh ../..
