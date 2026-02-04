@@ -42,13 +42,15 @@ function M.annotation_key(annotation)
         local p0 = ""
         local p1 = ""
         if type(annotation.pos0) == "table" then
-            p0 = tostring(annotation.pos0.x / annotation.pos0.zoom)
-            p1 = tostring(annotation.pos1.x / annotation.pos1.zoom)
+            local zoom = annotation.pos0.zoom or 1
+            local page = annotation.page or annotation.pos0.page or 0
+            p0 = string.format("%d|%d|%d", page, math.floor(annotation.pos0.x / zoom), math.floor(annotation.pos0.y / zoom))
+            p1 = string.format("%d|%d", math.floor(annotation.pos1.x / zoom), math.floor(annotation.pos1.y / zoom))
         else
             p0 = annotation.pos0
             p1 = annotation.pos1
         end
-        return p0 .. "|" .. p1
+        return p0 .. "||" .. p1
     elseif M.is_bookmark(annotation) then
         return "BOOKMARK|" .. tostring(annotation.page)
     end
@@ -82,15 +84,20 @@ function M.map_to_list(map)
 end
 
 local function compare_positions(a, b, document)
+    if not a or not b then return 0 end
     if type(a) == "number" and type(b) == "number" then
         return b - a
     end
     if type(a) == "string" and type(b) == "string" then
-        return document:compareXPointers(a, b)
+        return document:compareXPointers(a, b) or 0
     end
     if type(a) == "table" and type(b) == "table" then
-        return document:comparePositions(a, b)
+        return document:comparePositions(a, b) or 0
     end
+    -- Fallback for mixed types (e.g. comparing page number vs XPointer)
+    -- We can't do a perfect comparison, but let's at least not crash.
+    -- Usually pageno is available in bookmarks and highlights can be mapped to page.
+    return 0
 end
 
 local function sort_keys_by_position(t, document)
@@ -103,7 +110,8 @@ local function sort_keys_by_position(t, document)
         local ann_b = t[b]
         local pos_a = ann_a.pos0 or ann_a.page
         local pos_b = ann_b.pos0 or ann_b.page
-        return compare_positions(pos_a, pos_b, document) > 0
+        local cmp = compare_positions(pos_a, pos_b, document)
+        return (cmp or 0) > 0
     end)
     return keys
 end
@@ -211,7 +219,8 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
         else
             local local_p = local_v.pos0 or local_v.page
             local income_p = income_v.pos0 or income_v.page
-            if compare_positions(local_p, income_p, document) > 0 then
+            local cmp = compare_positions(local_p, income_p, document)
+            if (cmp or 0) > 0 then
                 merged[local_k] = local_v
                 l = l + 1
             else
@@ -239,7 +248,8 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
     local merged_list = M.map_to_list(merged)
     if widget and widget.ui and widget.ui.annotation and widget.ui.document == document then
         table.sort(merged_list, function(a, b)
-            return compare_positions(a.page, b.page, widget.ui.document) > 0
+            local cmp = compare_positions(a.page, b.page, widget.ui.document)
+            return (cmp or 0) > 0
         end)
         widget.ui.annotation.annotations = merged_list
         widget.ui.annotation:onSaveSettings()
