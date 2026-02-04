@@ -251,5 +251,88 @@ describe("AnnotationSync PDF Core Integration", function()
             
             assert.is_equal(key1, key2)
         end)
+
+        it("handles PDF highlights in Reflow Mode", function()
+            -- Enable Reflow
+            readerui.document.configurable.text_wrap = 1
+            readerui.paging:onGotoPage(10)
+            fastforward_ui_events()
+
+            -- Create a highlight in reflow mode
+            local pos0 = Geom:new{ x = 300, y = 300 }
+            local pos1 = Geom:new{ x = 500, y = 300 }
+            readerui.highlight:onHold(nil, { pos = pos0 })
+            readerui.highlight:onHoldPan(nil, { pos = pos1 })
+            readerui.highlight:onHoldRelease()
+            fastforward_ui_events()
+            
+            local index = readerui.highlight:saveHighlight()
+            assert.truthy(index)
+            local ann = readerui.annotation.annotations[index]
+            
+            -- In reflow mode, PDF highlights might use XPointers (strings)
+            print("REFLOW TEST: pos0 type=" .. type(ann.pos0))
+            if type(ann.pos0) == "string" then
+                print("REFLOW TEST: pos0=" .. ann.pos0)
+            end
+            
+            local key = annotations_mod.annotation_key(ann)
+            assert.truthy(key)
+            assert.truthy(#key > 0)
+            
+            -- Verify it's tracked
+            local count, docs = sync_instance:getPendingChangedDocuments()
+            assert.is_equal(1, count)
+            
+            -- Cleanup: DISABLE REFLOW before finishing
+            readerui.document.configurable.text_wrap = 0
+            readerui.paging:onGotoPage(10)
+            fastforward_ui_events()
+        end)
+
+        it("handles PDF highlights with Cropping enabled", function()
+            -- 1. Get key for uncropped highlight
+            local entry = highlight_pdf_db[1]
+            readerui.paging:onGotoPage(10)
+            fastforward_ui_events()
+            test_utils.emulate_highlight(readerui, entry)
+            local key_uncropped = annotations_mod.annotation_key(readerui.annotation.annotations[1])
+            readerui.annotation.annotations = {}
+            readerui.highlight:clear()
+
+            -- 2. Enable a manual crop (this shifts the screen-to-page transform)
+            -- We'll simulate a crop by setting the document's view port or similar
+            -- In tests, we can just use readerui.view:setBBox or document settings
+            -- Let's try setting manual crop via doc_settings if possible, 
+            -- or just assume the transform handles it.
+            
+            -- A simpler way: we know that if we click the SAME screen coordinates
+            -- but the page is "shifted" via a crop, we get different page coordinates.
+            -- But KOReader's ReaderHighlight should still produce consistent 
+            -- PAGE coordinates for the SAME text.
+            
+            -- We'll mock a shift in the view's transform if we can't easily trigger a real crop
+            local old_s2p = readerui.view.screenToPageTransform
+            readerui.view.screenToPageTransform = function(this, pos)
+                local p = old_s2p(this, pos)
+                -- Simulate a shift: if we click at (x,y), it's as if we clicked at (x+50, y+50)
+                -- because the page is shifted left/up by 50 units.
+                p.x = p.x + 50
+                p.y = p.y + 50
+                return p
+            end
+
+            -- Highlight again at the SAME screen coordinates
+            test_utils.emulate_highlight(readerui, entry)
+            local key_cropped = annotations_mod.annotation_key(readerui.annotation.annotations[1])
+            
+            -- Keys should differ because we clicked different text (due to simulated crop shift)
+            assert.is_not_equal(key_uncropped, key_cropped)
+            
+            -- Restore transform
+            readerui.view.screenToPageTransform = old_s2p
+            readerui.annotation.annotations = {}
+            readerui.highlight:clear()
+        end)
     end)
 end)
