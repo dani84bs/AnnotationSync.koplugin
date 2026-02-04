@@ -17,11 +17,11 @@ function M.read_json(path)
     local ok, data = pcall(json.decode, content)
     if ok and type(data) == "table" then
         if data.error_summary or (data.error and type(data.error) == "table") then
-            return {}
+            return nil
         end
         return data
     end
-    return {}
+    return nil
 end
 
 function M.insert_after_statistics(key)

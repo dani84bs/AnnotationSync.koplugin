@@ -70,14 +70,20 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
             assert.is_true(sync_instance:hasPendingChangedDocuments())
         end)
 
-        it("should handle malformed remote data gracefully", function()
+        it("should handle malformed remote data gracefully and abort upload", function()
             local income_file = test_utils.write_mock_json(test_data_dir, "malformed.json", "{ malformed json ...")
 
+            local upload_called = false
             SyncService.sync = function(server, local_path, callback, upload_only)
-                callback(local_path, local_path, income_file)
+                local success = callback(local_path, local_path, income_file)
+                if success then
+                    upload_called = true
+                end
+                return success
             end
 
             sync_instance:manualSync()
+            assert.is_false(upload_called, "Sync should have aborted and not proceeded to upload")
         end)
     end)
 
