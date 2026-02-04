@@ -64,6 +64,37 @@ Tools -> AnnotationSync -> Settings -> Use filename instead of hash
 By doing so the filename on every device should be the same.
 This option should be chosen by users that change file metadata (e.g. with Calibre) otherwise the hash would change everytime you make any modification.
 
+## 🧪 Running Tests
+
+The project includes a comprehensive integration test suite. To run them, you need a KOReader development environment (`kodev`).
+
+### 1. Setup
+Test files must be symbolically linked into the KOReader core `spec/unit` directory:
+
+```bash
+cd /path/to/koreader
+ln -s ../../plugins/AnnotationSync.koplugin/spec/unit/*.lua spec/unit/
+```
+
+### 2. Execute Tests
+Run all tests or a specific suite using `./kodev`:
+
+```bash
+# Run all AnnotationSync integration tests
+./kodev test front sync_integration sync_pdf_integration sync_bookmark sync_mixed_offline sync_protection error_handling
+
+# Run a specific suite (e.g., PDF integration)
+./kodev test front sync_pdf_integration
+```
+
+### 3. Test Suites
+- `sync_integration`: Core EPUB merging and conflict resolution.
+- `sync_pdf_integration`: PDF-specific coordinate merging and drift tolerance.
+- `sync_bookmark`: Bookmark (page-based) tracking and synchronization.
+- `sync_mixed_offline`: "Sync All" behavior with mixed document types and offline handling.
+- `sync_protection`: Safety checks to prevent accidental remote data loss.
+- `error_handling`: Network flakiness and malformed data scenarios.
+
 ## 🤝 Contributing
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
 
