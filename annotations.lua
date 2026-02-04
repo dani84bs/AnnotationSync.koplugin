@@ -42,8 +42,8 @@ function M.annotation_key(annotation)
         local p0 = ""
         local p1 = ""
         if type(annotation.pos0) == "table" then
-            p0 = tostring(annotation.pos0.x / annotation.pos0.zoom)
-            p1 = tostring(annotation.pos1.x / annotation.pos1.zoom)
+            p0 = tostring(math.floor(annotation.pos0.x / (annotation.pos0.zoom or 1)))
+            p1 = tostring(math.floor(annotation.pos1.x / (annotation.pos1.zoom or 1)))
         else
             p0 = annotation.pos0
             p1 = annotation.pos1

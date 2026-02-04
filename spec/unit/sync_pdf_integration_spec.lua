@@ -113,6 +113,68 @@ describe("AnnotationSync PDF Core Integration", function()
             assert.is_equal(2, #readerui.annotation.annotations)
         end)
 
+        it("merges overlapping PDF highlights (latest wins)", function()
+            -- Local has a highlight
+            local entry = highlight_pdf_db[1]
+            test_utils.emulate_highlight(readerui, entry)
+            local local_ann = readerui.annotation.annotations[1]
+            local_ann.datetime = "2026-02-01 10:00:00"
+            local_ann.note = "Local Version"
+            
+            -- Remote has an OVERLAPPING highlight (same page, slightly different coordinates)
+            -- We'll manually construct it to ensure it overlaps
+            local remote_ann = util.tableDeepCopy(local_ann)
+            remote_ann.pos1.x = remote_ann.pos1.x + 10 -- Slightly longer
+            remote_ann.datetime = "2026-02-01 11:00:00" -- Newer
+            remote_ann.note = "Remote Newer Version"
+            
+            local key_r = annotations_mod.annotation_key(remote_ann)
+            local income_path = test_utils.write_mock_json(test_data_dir, "income_overlap_pdf.json", { [key_r] = remote_ann })
+            local last_sync_path = test_utils.write_mock_json(test_data_dir, "last_overlap_pdf.json", {})
+
+            SyncService.sync = function(server, local_path, callback, upload_only)
+                callback(local_path, last_sync_path, income_path)
+            end
+
+            sync_instance:manualSync()
+
+            -- Should have 1 highlight (merged) and it should be the remote one (newer)
+            assert.is_equal(1, #readerui.annotation.annotations)
+            assert.is_equal("Remote Newer Version", readerui.annotation.annotations[1].note)
+        end)
+
+        it("handles slight coordinate drift (drift tolerance)", function()
+            -- Local has a highlight
+            local entry = highlight_pdf_db[1]
+            test_utils.emulate_highlight(readerui, entry)
+            local local_ann = readerui.annotation.annotations[1]
+            local_ann.datetime = "2026-02-01 10:00:00"
+            local_ann.note = "Local Original"
+            
+            -- Remote has the same highlight but with slight coordinate drift (e.g. 0.5 units)
+            local remote_ann = util.tableDeepCopy(local_ann)
+            remote_ann.pos0.x = remote_ann.pos0.x + 0.5
+            remote_ann.pos1.x = remote_ann.pos1.x - 0.5
+            remote_ann.datetime = "2026-02-01 11:00:00" -- Newer
+            remote_ann.note = "Drifted Version"
+            
+            local key_l = annotations_mod.annotation_key(local_ann)
+            local key_r = annotations_mod.annotation_key(remote_ann)
+            
+            local income_path = test_utils.write_mock_json(test_data_dir, "income_drift_pdf.json", { [key_r] = remote_ann })
+            local last_sync_path = test_utils.write_mock_json(test_data_dir, "last_drift_pdf.json", {})
+
+            SyncService.sync = function(server, local_path, callback, upload_only)
+                callback(local_path, last_sync_path, income_path)
+            end
+
+            sync_instance:manualSync()
+
+            -- Should still merge because they intersect significantly
+            assert.is_equal(1, #readerui.annotation.annotations)
+            assert.is_equal("Drifted Version", readerui.annotation.annotations[1].note)
+        end)
+
         it("resolves PDF conflicts using timestamps (latest wins)", function()
             local ann_l, key = create_pdf_ann_from_db(1, "Local Newer PDF", "2026-02-02 12:00:00")
             table.insert(readerui.annotation.annotations, ann_l)
