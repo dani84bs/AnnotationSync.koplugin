@@ -5,6 +5,7 @@
 > Never lose a highlight or note again—AnnotationSync keeps your reading life in sync across all your devices.
 
 ## 🚀 Features
+
 - **Cloud sync for KOReader annotations** (highlights, notes, bookmarks)
 - **Manual sync & remote backup** for peace of mind
 - **Easy access from KOReader's main menu**
@@ -15,11 +16,13 @@
 - **Lightweight, minimal setup—just enable and configure!**
 
 ## 📦 Installation
+
 1. Copy this folder to your KOReader `plugins` directory (make sure it is named `AnnotationSync.koplugin`)
 2. Restart KOReader.
 3. Enable AnnotationSync from the plugins menu.
 
 ## 🛠 Usage
+
 - Open KOReader and activate AnnotationSync from the plugins menu:
   - Tools -> More tools -> Plugin management
 - Choose the cloud storage source in Annotation Sync settings:
@@ -40,10 +43,12 @@
   - Use the "Annotation Sync: Sync All" button to mass upload them.
 
 ### 📦 DropBox setup
+
 Setting up Dropbox on Koreader can be a little bit difficult. 
 [This excellent post on mobileread forum](https://www.mobileread.com/forums/showthread.php?t=353670) explains the procedure in detail.
 
 ## Details
+
 AnnotationSync stores its files directly in the selected cloud storage
 directory, so you may want to create a new directory dedicated to AnnotationSync.
 By using the default settings (i.e. "Use filename instead of hash" unchecked) the sync files are named according to a hash of the document being synced, so it
@@ -67,8 +72,22 @@ This option should be chosen by users that change file metadata (e.g. with Calib
 ## 🧪 Running Tests
 
 The project includes a comprehensive integration test suite. To run them, you need a KOReader development environment (`kodev`).
+There are two ways for running them:
+- Automated script
+- Manual run
 
-### 1. Setup
+### Automated script
+
+The script should take care of manually setting up the tests inside KOReader's base directory and run them.
+
+```bash
+./run_tests.sh <path_to_koreader>
+```
+
+### Manual run
+
+#### 1. Setup
+
 Test files must be symbolically linked into the KOReader core `spec/unit` directory:
 
 ```bash
@@ -76,7 +95,8 @@ cd /path/to/koreader
 ln -s ../../plugins/AnnotationSync.koplugin/spec/unit/*.lua spec/unit/
 ```
 
-### 2. Execute Tests
+#### 2. Execute Tests
+
 Run all tests or a specific suite using `./kodev`:
 
 ```bash
@@ -87,7 +107,8 @@ Run all tests or a specific suite using `./kodev`:
 ./kodev test front sync_pdf_integration
 ```
 
-### 3. Test Suites
+#### 3. Test Suites
+
 - `sync_integration`: Core EPUB merging and conflict resolution.
 - `sync_pdf_integration`: PDF-specific coordinate merging and drift tolerance.
 - `sync_bookmark`: Bookmark (page-based) tracking and synchronization.
@@ -96,9 +117,11 @@ Run all tests or a specific suite using `./kodev`:
 - `error_handling`: Network flakiness and malformed data scenarios.
 
 ## 🤝 Contributing
+
 Pull requests, feature suggestions, and bug reports are very welcome! Open an issue or submit a PR.
 
 ## 📄 Known Issues
+
 - ~~Can't synchronize pdf higlights due to their different data structure.~~ Fixed
 - ~~Binding the "Annotation Sync: Manual Sync" action to a profile with "Auto-execute -> on book closing" will cause KOReader to crash.~~ Fixed
 
