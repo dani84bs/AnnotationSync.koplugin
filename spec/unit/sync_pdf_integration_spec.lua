@@ -212,4 +212,44 @@ describe("AnnotationSync PDF Core Integration", function()
             assert.is_equal(0, #readerui.annotation.annotations)
         end)
     end)
+
+    describe("Edge Cases (PDF)", function()
+        it("distinguishes PDF highlights on different pages with same X", function()
+            local ann1, key1 = create_pdf_ann_from_db(1)
+            local ann2 = util.tableDeepCopy(ann1)
+            ann2.page = ann1.page + 1
+            ann2.pos0.page = ann2.page
+            ann2.pos1.page = ann2.page
+            local key2 = annotations_mod.annotation_key(ann2)
+            
+            assert.is_not_equal(key1, key2)
+        end)
+
+        it("distinguishes PDF highlights on different lines with same X", function()
+            local ann1, key1 = create_pdf_ann_from_db(1) -- y=60
+            local ann2 = util.tableDeepCopy(ann1)
+            ann2.pos0.y = ann1.pos0.y + 100 -- different line
+            ann2.pos1.y = ann1.pos1.y + 100
+            local key2 = annotations_mod.annotation_key(ann2)
+            
+            assert.is_not_equal(key1, key2)
+        end)
+
+        it("normalizes coordinates across different zoom levels", function()
+            local ann1, key1 = create_pdf_ann_from_db(1)
+            ann1.pos0.zoom = 1.0
+            ann1.pos1.zoom = 1.0
+            
+            local ann2 = util.tableDeepCopy(ann1)
+            ann2.pos0.x = ann1.pos0.x * 2
+            ann2.pos0.y = ann1.pos0.y * 2
+            ann2.pos1.x = ann1.pos1.x * 2
+            ann2.pos1.y = ann1.pos1.y * 2
+            ann2.pos0.zoom = 2.0
+            ann2.pos1.zoom = 2.0
+            local key2 = annotations_mod.annotation_key(ann2)
+            
+            assert.is_equal(key1, key2)
+        end)
+    end)
 end)

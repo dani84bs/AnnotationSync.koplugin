@@ -42,13 +42,15 @@ function M.annotation_key(annotation)
         local p0 = ""
         local p1 = ""
         if type(annotation.pos0) == "table" then
-            p0 = tostring(math.floor(annotation.pos0.x / (annotation.pos0.zoom or 1)))
-            p1 = tostring(math.floor(annotation.pos1.x / (annotation.pos1.zoom or 1)))
+            local zoom = annotation.pos0.zoom or 1
+            local page = annotation.page or annotation.pos0.page or 0
+            p0 = string.format("%d|%d|%d", page, math.floor(annotation.pos0.x / zoom), math.floor(annotation.pos0.y / zoom))
+            p1 = string.format("%d|%d", math.floor(annotation.pos1.x / zoom), math.floor(annotation.pos1.y / zoom))
         else
             p0 = annotation.pos0
             p1 = annotation.pos1
         end
-        return p0 .. "|" .. p1
+        return p0 .. "||" .. p1
     elseif M.is_bookmark(annotation) then
         return "BOOKMARK|" .. tostring(annotation.page)
     end
