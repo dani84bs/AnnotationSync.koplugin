@@ -192,6 +192,12 @@ function M.sync_callback(widget, document, local_file, last_sync_file, income_fi
     local local_map = utils.read_json(local_file)
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
+
+    if not local_map or not last_sync_map or not income_map then
+        logger.warn("AnnotationSync: Failed to load one or more sync files. Aborting to prevent data loss.")
+        return false
+    end
+
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, last_sync_map, document)
     local merged = {}

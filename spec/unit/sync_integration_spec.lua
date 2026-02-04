@@ -80,6 +80,45 @@ describe("AnnotationSync Core Integration", function()
             sync_instance:manualSync()
             assert.is_false(sync_instance:hasPendingChangedDocuments())
         end)
+
+        it("handles first sync of an empty book gracefully", function()
+            -- Ensure no previous files exist
+            local file = readerui.document.file
+            local sdr_dir = require("docsettings"):getSidecarDir(file)
+            local hash = require("util").partialMD5(file)
+            os.remove(sdr_dir .. "/" .. hash .. ".json")
+            os.remove(sdr_dir .. "/" .. hash .. ".json.sync")
+            os.remove(sdr_dir .. "/" .. hash .. ".json.temp")
+
+            -- Sync an empty book
+            sync_instance:manualSync()
+
+            -- Should succeed and update metadata
+            assert.is_not_equal("Never", sync_instance.settings.last_sync)
+            assert.is_equal(0, #readerui.annotation.annotations)
+        end)
+
+        it("handles first sync with local annotations gracefully", function()
+            -- 1. Ensure no previous files exist
+            local file = readerui.document.file
+            local sdr_dir = require("docsettings"):getSidecarDir(file)
+            local hash = require("util").partialMD5(file)
+            os.remove(sdr_dir .. "/" .. hash .. ".json")
+            os.remove(sdr_dir .. "/" .. hash .. ".json.sync")
+            os.remove(sdr_dir .. "/" .. hash .. ".json.temp")
+
+            -- 2. Create some local annotations
+            test_utils.emulate_highlight(readerui, highlight_db[1])
+            assert.is_equal(1, #readerui.annotation.annotations)
+
+            -- 3. Sync (First time)
+            sync_instance:manualSync()
+
+            -- 4. Should succeed, mark as clean, and have 1 annotation
+            assert.is_not_equal("Never", sync_instance.settings.last_sync)
+            assert.is_equal(1, #readerui.annotation.annotations)
+            assert.is_false(sync_instance:hasPendingChangedDocuments())
+        end)
     end)
 
     describe("Bidirectional Merge & Conflicts", function()
