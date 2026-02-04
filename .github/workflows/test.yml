@@ -38,6 +38,35 @@ jobs:
         with:
           path: koreader_core/plugins/AnnotationSync.koplugin
 
+      - name: Generate Cache Key
+        run: |
+          cd koreader_core
+          make TARGET= cache-key
+
+      - name: Cache Thirdparty
+        uses: actions/cache@v4
+        with:
+          path: koreader_core/base/thirdparty
+          key: ${{ runner.os }}-thirdparty-${{ hashFiles('koreader_core/cache-key') }}
+          restore-keys: |
+            ${{ runner.os }}-thirdparty-
+
+      - name: Cache Build Directory
+        uses: actions/cache@v4
+        with:
+          path: koreader_core/build
+          key: ${{ runner.os }}-build-${{ hashFiles('koreader_core/cache-key') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ hashFiles('koreader_core/cache-key') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
       - name: Fetch Thirdparty
         run: |
           cd koreader_core
@@ -47,7 +76,12 @@ jobs:
       - name: Build Base (Needed for tests)
         run: |
           cd koreader_core
-          make base
+          # Use --assume-old=base if we have a cached build to avoid unnecessary rebuilds
+          if [ -d build ]; then
+            make base --assume-old=base
+          else
+            make base
+          fi
 
       - name: Run AnnotationSync Tests
         run: |
