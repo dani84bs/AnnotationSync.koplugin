@@ -4,6 +4,7 @@ local Event = require("ui/event")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
 local InfoMessage = require("ui/widget/infomessage")
+local ConfirmBox = require("ui/widget/confirmbox")
 local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
@@ -266,10 +267,15 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
         table.insert(menu_items, {
             text = text,
             callback = function()
-                -- For now just show info, we can add restore later if needed
-                UIManager:show(InfoMessage:new{
-                    text = T(_("Deleted Annotation:\nPage: %1\nText: %2\nDeleted at: %3"), 
-                        ann.page, ann.text or ann.notes or "", ann.datetime_updated or "unknown"),
+                UIManager:show(ConfirmBox:new{
+                    text = T(_("Do you want to restore this annotation?\n\nPage %1: %2"), 
+                        ann.page, ann.text or ann.notes or ""),
+                    type = "yesno",
+                    ok_text = _("Restore"),
+                    cancel_text = _("Close"),
+                    ok_callback = function()
+                        self:restoreAnnotation(ann)
+                    end
                 })
             end
         })
@@ -280,6 +286,23 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
         item_table = menu_items,
     }
     UIManager:show(deleted_menu)
+end
+
+function AnnotationSyncPlugin:restoreAnnotation(ann)
+    local document = self.ui and self.ui.document
+    if not document then return end
+
+    -- 1. Mark as not deleted and update timestamp
+    ann.deleted = false
+    ann.datetime_updated = os.date("%Y-%m-%d %H:%M:%S")
+    
+    -- 2. Add back to current list
+    local current = self.manager:getAnnotationsForDocument(document)
+    table.insert(current, ann)
+    
+    -- 3. Apply changes (saves to sidecar and refreshes UI)
+    self:applySyncedAnnotations(document, current)
+    utils.show_msg(_("Annotation restored."))
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)
