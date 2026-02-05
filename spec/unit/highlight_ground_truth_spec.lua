@@ -39,7 +39,7 @@ describe("AnnotationSync Highlight Ground Truth Integration", function()
         UIManager:show(readerui)
         fastforward_ui_events()
         readerui.annotation.annotations = {}
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
     end)
 
     it("should generate highlights for selected ground truth entries and track them", function()
@@ -63,7 +63,7 @@ describe("AnnotationSync Highlight Ground Truth Integration", function()
             assert.is_equal(entry.text, stored_ann.text)
         end
         
-        local count, changed_docs = sync_instance:getPendingChangedDocuments()
+        local count, changed_docs = sync_instance.manager:getPendingChangedDocuments()
         assert.is_equal(1, count)
         assert.is_true(changed_docs[readerui.document.file])
     end)

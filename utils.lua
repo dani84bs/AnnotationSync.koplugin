@@ -1,6 +1,7 @@
 local reader_order = require("ui/elements/reader_menu_order")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
+local json = require("json")
 
 local M = {}
 

@@ -48,7 +48,7 @@ describe("AnnotationSync Core Integration", function()
         readerui.annotation.annotations = {}
         sync_instance.settings.last_sync = "Never"
         sync_instance.settings.use_filename = true
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
         
         test_utils.mock_sync_service(SyncService)
     end)
@@ -73,12 +73,12 @@ describe("AnnotationSync Core Integration", function()
             fastforward_ui_events()
             test_utils.emulate_highlight(readerui, highlight_db[1])
 
-            local count, docs = sync_instance:getPendingChangedDocuments()
+            local count, docs = sync_instance.manager:getPendingChangedDocuments()
             assert.is_equal(1, count)
             assert.is_true(docs[readerui.document.file])
 
             sync_instance:manualSync()
-            assert.is_false(sync_instance:hasPendingChangedDocuments())
+            assert.is_false(sync_instance.manager:hasPendingChangedDocuments())
         end)
 
         it("handles first sync of an empty book gracefully", function()
@@ -117,7 +117,7 @@ describe("AnnotationSync Core Integration", function()
             -- 4. Should succeed, mark as clean, and have 1 annotation
             assert.is_not_equal("Never", sync_instance.settings.last_sync)
             assert.is_equal(1, #readerui.annotation.annotations)
-            assert.is_false(sync_instance:hasPendingChangedDocuments())
+            assert.is_false(sync_instance.manager:hasPendingChangedDocuments())
         end)
     end)
 

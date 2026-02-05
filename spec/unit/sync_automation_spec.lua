@@ -45,7 +45,7 @@ describe("AnnotationSync Automation & Settings", function()
         UIManager:show(readerui)
         fastforward_ui_events()
         readerui.annotation.annotations = {}
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
         test_utils.mock_sync_service(SyncService)
     end)
 
@@ -73,7 +73,7 @@ describe("AnnotationSync Automation & Settings", function()
         it("triggers sync on NetworkConnected", function()
             sync_instance.settings.network_auto_sync = true
             sync_instance:registerEvents()
-            sync_instance:addToChangedDocumentsFile(readerui.document.file)
+            sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
 
             local sync_triggered = false
             SyncService.sync = function(server, local_path, callback, upload_only)
@@ -94,8 +94,8 @@ describe("AnnotationSync Automation & Settings", function()
             local doc1 = readerui.document.file
             local doc2 = "spec/front/unit/data/leaves.epub"
             
-            sync_instance:addToChangedDocumentsFile(doc1)
-            sync_instance:addToChangedDocumentsFile(doc2)
+            sync_instance.manager:addToChangedDocumentsFile(doc1)
+            sync_instance.manager:addToChangedDocumentsFile(doc2)
             
             local synced_files = {}
             SyncService.sync = function(server, local_path, callback, upload_only)
@@ -103,8 +103,8 @@ describe("AnnotationSync Automation & Settings", function()
                 callback(local_path, local_path, local_path)
             end
 
-            local old_getDoc = sync_instance.getDocumentByFile
-            sync_instance.getDocumentByFile = function(this, file)
+            local old_getDoc = sync_instance.manager.getDocumentByFile
+            sync_instance.manager.getDocumentByFile = function(this, file)
                 if file == doc1 then return readerui.document end
                 return { 
                     file = file, provider = "crengine", render = function() end,
@@ -112,10 +112,10 @@ describe("AnnotationSync Automation & Settings", function()
                 }
             end
             
-            sync_instance:syncAllChangedDocuments()
+            sync_instance.manager:syncAllChangedDocuments()
             assert.is_equal(2, #synced_files)
             
-            sync_instance.getDocumentByFile = old_getDoc
+            sync_instance.manager.getDocumentByFile = old_getDoc
         end)
     end)
 end)
