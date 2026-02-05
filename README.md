@@ -12,6 +12,7 @@
 - **Configurable cloud server settings**
 - **Smart merging:** resolves annotation conflicts by update time
 - **Detects and marks deleted annotations**
+- **Trash Bin & Restoration:** easily view and undelete accidentally removed notes
 - **Supports multiple annotation formats & metadata**
 - **Lightweight, minimal setup—just enable and configure!**
 
@@ -37,6 +38,11 @@
   - Use the menu: Tools -> Annotation Sync -> Manual Sync
   - Or bind the "Annotation Sync: Manual Sync" action to a gesture or keyboard shortcut
   - Or add the "Annotation Sync: Manual Sync" action to a profile action list
+
+- Restore deleted annotations:
+  - Use the menu: Tools -> Annotation Sync -> Show Deleted
+  - Tap on any deleted item to restore it, or use "Restore All" to recover everything.
+  - Restored items will be re-synced to the cloud on the next sync.
 
 - Sync old annotations:
   - The plugin keeps track of the annotations you make without syncing (like when offline).
@@ -101,7 +107,7 @@ Run all tests or a specific suite using `./kodev`:
 
 ```bash
 # Run all AnnotationSync integration tests
-./kodev test front sync_integration sync_pdf_integration sync_bookmark sync_mixed_offline sync_protection error_handling
+./kodev test front sync_integration sync_pdf_integration sync_bookmark sync_mixed_offline sync_protection sync_trash error_handling
 
 # Run a specific suite (e.g., PDF integration)
 ./kodev test front sync_pdf_integration
@@ -114,6 +120,7 @@ Run all tests or a specific suite using `./kodev`:
 - `sync_bookmark`: Bookmark (page-based) tracking and synchronization.
 - `sync_mixed_offline`: "Sync All" behavior with mixed document types and offline handling.
 - `sync_protection`: Safety checks to prevent accidental remote data loss.
+- `sync_trash`: Verification of deleted item retrieval and restoration logic.
 - `error_handling`: Network flakiness and malformed data scenarios.
 
 ## 🤝 Contributing
