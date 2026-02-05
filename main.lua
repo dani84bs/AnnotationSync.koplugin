@@ -258,6 +258,27 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
     local deleted_menu
     local menu_items = {}
 
+    -- Add Restore All button at the top
+    table.insert(menu_items, {
+        text = _("Restore All"),
+        bold = true,
+        callback = function()
+            UIManager:show(ConfirmBox:new{
+                text = T(_("Are you sure you want to restore all %1 deleted annotations?"), #deleted),
+                type = "yesno",
+                ok_text = _("Restore All"),
+                ok_callback = function()
+                    for _, ann in ipairs(deleted) do
+                        self:restoreAnnotation(ann, true) -- true = silent
+                    end
+                    utils.show_msg(T(_("Restored %1 annotations."), #deleted))
+                    if deleted_menu then UIManager:close(deleted_menu) end
+                end
+            })
+        end,
+        separator = true,
+    })
+
     for i, ann in ipairs(deleted) do
         local text = ann.text or ann.notes or _("Highlight")
         if text == "" then text = _("Highlight") end
@@ -288,7 +309,7 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
     UIManager:show(deleted_menu)
 end
 
-function AnnotationSyncPlugin:restoreAnnotation(ann)
+function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
     local document = self.ui and self.ui.document
     if not document then return end
 
@@ -302,7 +323,9 @@ function AnnotationSyncPlugin:restoreAnnotation(ann)
     
     -- 3. Apply changes (saves to sidecar and refreshes UI)
     self:applySyncedAnnotations(document, current)
-    utils.show_msg(_("Annotation restored."))
+    if not silent then
+        utils.show_msg(_("Annotation restored."))
+    end
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)

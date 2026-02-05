@@ -106,4 +106,23 @@ describe("AnnotationSync Trash & Restore", function()
         -- Cleanup
         require("ui/event").new = old_event_new
     end)
+
+    it("should restore all deleted annotations in bulk", function()
+        readerui.annotation.annotations = {}
+        local deleted_items = {
+            { page = 1, pos0 = "p1", pos1 = "p2", text = "One", deleted = true },
+            { page = 2, pos0 = "p3", pos1 = "p4", text = "Two", deleted = true }
+        }
+
+        -- 1. Restore all
+        for _, ann in ipairs(deleted_items) do
+            sync_instance:restoreAnnotation(ann, true) -- silent
+        end
+
+        -- 2. Verify
+        assert.is_equal(2, #readerui.annotation.annotations)
+        for _, ann in ipairs(readerui.annotation.annotations) do
+            assert.is_false(ann.deleted)
+        end
+    end)
 end)
