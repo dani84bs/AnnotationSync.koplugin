@@ -122,6 +122,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 separator = true,
             },
             {
+                text = _("Show Deleted"),
+                enabled = ((self.ui and self.ui.document) ~= nil),
+                callback = function()
+                    self:showDeletedAnnotations()
+                end,
+                separator = true,
+            },
+            {
                 enabled = false,
                 text_func = function()
                    return T(_("Last sync: %1"), self.settings.last_sync)
@@ -233,6 +241,45 @@ function AnnotationSyncPlugin:manualSync()
     end
     self.manager:syncDocument(document, true)
     self.manager:updateLastSync("Manual Sync")
+end
+
+function AnnotationSyncPlugin:showDeletedAnnotations()
+    local document = self.ui and self.ui.document
+    if not document then return end
+
+    local deleted = self.manager:getDeletedAnnotations(document)
+    if #deleted == 0 then
+        utils.show_msg(_("No deleted annotations found for this document."))
+        return
+    end
+
+    local Menu = require("ui/widget/menu")
+    local deleted_menu
+    local menu_items = {}
+
+    for i, ann in ipairs(deleted) do
+        local text = ann.text or ann.notes or _("Highlight")
+        if text == "" then text = _("Highlight") end
+        -- Truncate long text
+        if #text > 50 then text = text:sub(1, 47) .. "..." end
+        
+        table.insert(menu_items, {
+            text = T(_("Page %1: %2"), ann.page, text),
+            callback = function()
+                -- For now just show info, we can add restore later if needed
+                UIManager:show(InfoMessage:new{
+                    text = T(_("Deleted Annotation:\nPage: %1\nText: %2\nDeleted at: %3"), 
+                        ann.page, ann.text or ann.notes or "", ann.datetime_updated or "unknown"),
+                })
+            end
+        })
+    end
+
+    deleted_menu = Menu:new{
+        title = _("Deleted Annotations"),
+        item_table = menu_items,
+    }
+    UIManager:show(deleted_menu)
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)
