@@ -50,13 +50,13 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
         sync_instance.settings.use_filename = false
         sync_instance.settings.last_sync = "Never"
         
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
     end)
 
     describe("4.1 Network & Server Errors", function()
         it("should keep document dirty if server is offline", function()
-            sync_instance:addToChangedDocumentsFile(readerui.document.file)
-            assert.is_true(sync_instance:hasPendingChangedDocuments())
+            sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+            assert.is_true(sync_instance.manager:hasPendingChangedDocuments())
 
             -- Mock SyncService.sync to simulate a failure (callback never called)
             SyncService.sync = function(server, local_path, sync_cb, is_silent)
@@ -67,7 +67,7 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
             sync_instance:manualSync()
 
             -- Fixed: It should now remain dirty because the callback (which triggers removal) was never called
-            assert.is_true(sync_instance:hasPendingChangedDocuments())
+            assert.is_true(sync_instance.manager:hasPendingChangedDocuments())
         end)
 
         it("should handle malformed remote data gracefully and abort upload", function()

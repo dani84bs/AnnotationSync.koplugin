@@ -1,5 +1,6 @@
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
+local Event = require("ui/event")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
 local InfoMessage = require("ui/widget/infomessage")
@@ -17,6 +18,7 @@ local logger = require("logger")
 local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
+local SyncManager = require("manager")
 
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
@@ -26,6 +28,7 @@ local AnnotationSyncPlugin = WidgetContainer:extend {
     is_doc_only = false,
 
     settings = nil,
+    manager = nil,
 }
 
 AnnotationSyncPlugin.default_settings = {
@@ -40,6 +43,7 @@ function AnnotationSyncPlugin:init()
     self:onDispatcherRegisterActions()
 
     self.settings = G_reader_settings:readSetting(self.plugin_id, self.default_settings)
+    self.manager = SyncManager:new(self)
 
     -- Migrate old annotation_sync_use_filename setting
     if G_reader_settings:has("annotation_sync_use_filename") then
@@ -48,24 +52,6 @@ function AnnotationSyncPlugin:init()
     end
 
     self:registerEvents()
-end
-
-function AnnotationSyncPlugin:registerEvents()
-    if self.settings.network_auto_sync then
-        self.onNetworkConnected = self._onNetworkConnected
-    else
-        self.onNetworkConnected = nil
-    end
-end
-
-function AnnotationSyncPlugin:_onNetworkConnected()
-    logger.dbg("AnnotationSync: handling event: NetworkConnected")
-    if self:hasPendingChangedDocuments() then
-        utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
-        UIManager:scheduleIn(1, function()
-            self:syncAllChangedDocuments()
-        end)
-    end
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
@@ -131,7 +117,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     utils.show_msg(sync_all_description)
                 end,
                 callback = function()
-                    self:syncAllChangedDocuments()
+                    self.manager:syncAllChangedDocuments()
                 end,
                 separator = true,
             },
@@ -152,107 +138,58 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
         }
     }
-
 end
 
-function AnnotationSyncPlugin:hasPendingChangedDocuments()
-    local count, _ = self:getPendingChangedDocuments()
-    return count > 0
-end
-
-function AnnotationSyncPlugin:getPendingChangedDocuments()
-    local count = 0
-    local track_path = self:changedDocumentsFile()
-    local ok, changed_docs = pcall(dofile, track_path)
-    if ok and type(changed_docs) == "table" then
-        for _ in pairs(changed_docs) do count = count + 1 end
-    end
-    return count, changed_docs
-end
-
--- Sync all changed documents listed in changed_documents.lua
-function AnnotationSyncPlugin:syncAllChangedDocuments()
-    local total, changed_docs = self:getPendingChangedDocuments()
-    if total == 0 then
-        utils.show_msg("No changed documents to sync.")
-        return
-    end
-    local count = 0
-    for file, _ in pairs(changed_docs) do
-        -- Try to get a document object for this file, open if needed
-        local document = self:getDocumentByFile(file)
-        if document then
-            self:syncDocument(document)
-            count = count + 1
-        end
-    end
-    if count == 0 then
-        utils.show_msg("Unable to sync modified documents: " .. total)
+function AnnotationSyncPlugin:registerEvents()
+    if self.settings.network_auto_sync then
+        self.onNetworkConnected = self._onNetworkConnected
     else
-        self:updateLastSync("Sync All")
-        utils.show_msg("Successfully synced modified documents: " .. count)
+        self.onNetworkConnected = nil
     end
 end
 
-function AnnotationSyncPlugin:updateLastSync(descriptor)
-    local parenthetical = ""
-    if descriptor and type(descriptor) == "string" then
-        parenthetical = " (" .. descriptor .. ")"
+function AnnotationSyncPlugin:_onNetworkConnected()
+    logger.dbg("AnnotationSync: handling event: NetworkConnected")
+    if self.manager:hasPendingChangedDocuments() then
+        utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
+        UIManager:scheduleIn(1, function()
+            self.manager:syncAllChangedDocuments()
+        end)
     end
-    self.settings.last_sync = os.date("%Y-%m-%d %H:%M:%S") .. parenthetical
-    logger.dbg("AnnotationSync: updateLastSync: updated at " .. self.settings.last_sync)
 end
 
--- Helper to sync a document (same as manualSync but for a given document)
-function AnnotationSyncPlugin:syncDocument(document)
-    local file = document and document.file
-    if not file then return end
-    logger.dbg("AnnotationSync: syncing document: " .. file)
-    local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then return end
+function AnnotationSyncPlugin:applySyncedAnnotations(document, merged_list)
+    if self.ui and self.ui.annotation and self.ui.document == document then
+        -- 1. Sort for UI consistency
+        table.sort(merged_list, function(a, b)
+            local cmp = annotations.compare_positions(a.page, b.page, document)
+            return (cmp or 0) > 0
+        end)
+        -- 2. Update active widget state
+        self.ui.annotation.annotations = merged_list
+        self.ui.annotation:onSaveSettings()
 
-    local stored_annotations = self:getAnnotationsForDocument(document)
-
-    local annotation_filename
-    if self.settings.use_filename then
-        local filename = file:match("([^/]+)$") or file
-        annotation_filename = filename .. ".json"
-    else
-        local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
-        annotation_filename = hash .. ".json"
-    end
-    local json_path = sdr_dir .. "/" .. annotation_filename
-    annotations.write_annotations_json(document, stored_annotations, sdr_dir, annotation_filename)
-    logger.dbg("AnnotationSync: remote sync of " .. json_path)
-    remote.sync_annotations(self, document, json_path, function(success)
-        if success then
-            -- Remove from changed_documents.lua if present (only on success)
-            self:removeFromChangedDocumentsFile(document)
-        else
-            logger.warn("AnnotationSync: sync failed for " .. file .. ", keeping in changed list")
+        -- 3. Notify system
+        if #merged_list > 0 then
+            UIManager:broadcastEvent(Event:new("AnnotationsModified", merged_list))
         end
-    end)
-end
 
--- Helper to get a document object by file path (stub, needs integration with document management)
-function AnnotationSyncPlugin:getDocumentByFile(file)
-    -- This is a stub. Replace with actual lookup if available.
-    -- If only the current document is available, return it if it matches.
-    local document = self.ui and self.ui.document
-    if document and document.file == file then
-        return document
+        -- 4. Trigger Refreshes
+        if not document.is_pdf then
+            document:render()
+            self.ui.view:recalculate()
+            UIManager:setDirty(self.ui.view.dialog, "partial")
+        end
+    else
+        -- Update sidecar directly for inactive document
+        local annotation_sidecar = docsettings:open(document.file)
+        annotation_sidecar:saveSetting("annotations", merged_list)
+        annotation_sidecar:flush()
     end
-    document = DocumentRegistry:openDocument(file)
-    -- crengine documents must be rendered in order to use their XPointer functions
-    if document.provider == "crengine" then
-        logger.dbg("AnnotationSync: rendering: " .. file)
-        document:render()
-    end
-    return document
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncSyncAll()
-    self:syncAllChangedDocuments()
+    self.manager:syncAllChangedDocuments()
     return true
 end
 
@@ -294,8 +231,8 @@ function AnnotationSyncPlugin:manualSync()
         utils.show_msg("A document must be active to do a manual sync.")
         return
     end
-    self:updateLastSync("Manual Sync")
-    self:syncDocument(document)
+    self.manager:syncDocument(document, true)
+    self.manager:updateLastSync("Manual Sync")
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)
@@ -314,71 +251,8 @@ function AnnotationSyncPlugin:onAnnotationsModified(annotations)
             break
         end
         logger.dbg("AnnotationSync: Document annotations modified: " .. changed_file)
-        self:addToChangedDocumentsFile(changed_file)
+        self.manager:addToChangedDocumentsFile(changed_file)
     end
-end
-
--- Get annotations associated with given document
-function AnnotationSyncPlugin:getAnnotationsForDocument(document)
-    -- Handle active document
-    if document == self.ui.document and self.ui.annotation and self.ui.annotation.annotations then
-        return self.ui.annotation.annotations
-    end
-    -- Handle inactive document
-    local annotation_sidecar = docsettings:open(document.file)
-    local result = annotation_sidecar:readSetting("annotations")
-    return result or {}
-end
-
--- Lua file in the user data directory to track changed documents
-function AnnotationSyncPlugin:changedDocumentsFile()
-    return DataStorage:getDataDir() .. "/changed_documents.lua"
-end
-
-function AnnotationSyncPlugin:addToChangedDocumentsFile(file)
-    local track_path = self:changedDocumentsFile()
-    -- Load existing table or create new
-    local changed_docs = {}
-    local ok, loaded = pcall(dofile, track_path)
-    if ok and type(loaded) == "table" then
-        changed_docs = loaded
-    end
-    if file and type(file) == "string" then
-        changed_docs[file] = true
-        self:writeChangedDocumentsFile(changed_docs)
-    end
-end
-
-function AnnotationSyncPlugin:removeFromChangedDocumentsFile(document)
-    local file = document and document.file
-    local track_path = self:changedDocumentsFile()
-    local ok, changed_docs = pcall(dofile, track_path)
-    if ok and type(changed_docs) == "table" and changed_docs[file] then
-        changed_docs[file] = nil
-        self:writeChangedDocumentsFile(changed_docs)
-    end
-end
-
-function AnnotationSyncPlugin:writeChangedDocumentsFile(changed_docs)
-    local track_path = self:changedDocumentsFile()
-    local f = io.open(track_path, "w")
-    if f then
-        f:write("return ", serialize_table(changed_docs), "\n")
-        f:close()
-    else
-        logger.warn("AnnotationSync: Failed to open changed documents file: " .. track_path)
-    end
-end
-
-
--- Helper to serialize a Lua table as code
-function serialize_table(tbl)
-    local result = "{\n"
-    for k, v in pairs(tbl) do
-        result = result .. string.format("  [%q] = %s,\n", k, tostring(v))
-    end
-    result = result .. "}"
-    return result
 end
 
 return AnnotationSyncPlugin

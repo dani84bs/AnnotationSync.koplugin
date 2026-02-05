@@ -54,7 +54,7 @@ describe("AnnotationSync PDF Core Integration", function()
         readerui.annotation.annotations = {}
         sync_instance.settings.last_sync = "Never"
         sync_instance.settings.use_filename = true
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
         
         test_utils.mock_sync_service(SyncService)
     end)
@@ -85,12 +85,12 @@ describe("AnnotationSync PDF Core Integration", function()
             fastforward_ui_events()
             test_utils.emulate_highlight(readerui, highlight_pdf_db[1])
 
-            local count, docs = sync_instance:getPendingChangedDocuments()
+            local count, docs = sync_instance.manager:getPendingChangedDocuments()
             assert.is_equal(1, count)
             assert.is_true(docs[readerui.document.file])
 
             sync_instance:manualSync()
-            assert.is_false(sync_instance:hasPendingChangedDocuments())
+            assert.is_false(sync_instance.manager:hasPendingChangedDocuments())
         end)
     end)
 
@@ -281,7 +281,7 @@ describe("AnnotationSync PDF Core Integration", function()
             assert.truthy(#key > 0)
             
             -- Verify it's tracked
-            local count, docs = sync_instance:getPendingChangedDocuments()
+            local count, docs = sync_instance.manager:getPendingChangedDocuments()
             assert.is_equal(1, count)
             
             -- Cleanup: DISABLE REFLOW before finishing

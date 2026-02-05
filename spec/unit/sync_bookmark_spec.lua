@@ -48,7 +48,7 @@ describe("AnnotationSync Bookmark Synchronization", function()
         UIManager:show(readerui)
         fastforward_ui_events()
         readerui.annotation.annotations = {}
-        os.remove(sync_instance:changedDocumentsFile())
+        os.remove(sync_instance.manager:changedDocumentsFile())
         test_utils.mock_sync_service(SyncService)
     end)
 
@@ -64,7 +64,7 @@ describe("AnnotationSync Bookmark Synchronization", function()
         assert.truthy(bm.page)
         assert.falsy(bm.pos0) -- bookmarks don't have coordinates
 
-        local count, docs = sync_instance:getPendingChangedDocuments()
+        local count, docs = sync_instance.manager:getPendingChangedDocuments()
         assert.is_equal(1, count)
         assert.is_true(docs[readerui.document.file])
     end)
