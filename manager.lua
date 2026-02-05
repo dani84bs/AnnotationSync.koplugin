@@ -134,6 +134,35 @@ function SyncManager:getAnnotationsForDocument(document)
     return result or {}
 end
 
+-- Get only annotations marked as deleted in the local sync JSON
+function SyncManager:getDeletedAnnotations(document)
+    local file = document and document.file
+    if not file then return {} end
+
+    local sdr_dir = docsettings:getSidecarDir(file)
+    if not sdr_dir or sdr_dir == "" then return {} end
+
+    local filename = self:_getAnnotationFilename(file)
+    local json_path = sdr_dir .. "/" .. filename
+
+    local map = utils.read_json(json_path)
+    if not map then return {} end
+
+    local deleted = {}
+    for _, v in pairs(map) do
+        if v.deleted then
+            table.insert(deleted, v)
+        end
+    end
+
+    table.sort(deleted, function(a, b)
+        local cmp = annotations.compare_positions(a.page, b.page, document)
+        return (cmp or 0) > 0
+    end)
+
+    return deleted
+end
+
 -- Helper to get a document object by file path
 function SyncManager:getDocumentByFile(file)
     -- If only the current document is available, return it if it matches.
