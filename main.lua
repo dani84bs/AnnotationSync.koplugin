@@ -264,7 +264,7 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
         if #text > 50 then text = text:sub(1, 47) .. "..." end
         
         table.insert(menu_items, {
-            text = T(_("Page %1: %2"), ann.page, text),
+            text = text,
             callback = function()
                 -- For now just show info, we can add restore later if needed
                 UIManager:show(InfoMessage:new{
