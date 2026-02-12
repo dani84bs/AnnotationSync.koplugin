@@ -6,6 +6,7 @@ local _ = require("gettext")
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
+local lfs = require("libs/libkoreader-lfs")
 
 local annotations = require("annotations")
 local remote = require("remote")
@@ -34,8 +35,9 @@ function SyncManager:syncAllChangedDocuments()
         -- Try to get a document object for this file, open if needed
         local document = self:getDocumentByFile(file)
         if document then
-            self:syncDocument(document, false)
-            count = count + 1
+            if self:syncDocument(document, false) then
+                count = count + 1
+            end
         end
     end
     if count == 0 then
@@ -49,13 +51,19 @@ end
 -- Orchestrates the sync process for a single document
 function SyncManager:syncDocument(document, is_manual)
     local file = document and document.file
-    if not file then return end
+    if not file then return false end
 
     self:_flushSettings()
     logger.dbg("AnnotationSync: syncing document: " .. file)
 
     local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then return end
+    if not sdr_dir or sdr_dir == "" then return false end
+
+    -- Fix for Issue #34: Ensure the local sidecar directory exists
+    if not lfs.attributes(sdr_dir, "mode") then
+        logger.info("AnnotationSync: creating missing sidecar directory: " .. sdr_dir)
+        os.execute("mkdir -p " .. sdr_dir)
+    end
 
     local filename = self:_getAnnotationFilename(file)
     local json_path = sdr_dir .. "/" .. filename
@@ -63,9 +71,12 @@ function SyncManager:syncDocument(document, is_manual)
     annotations.write_annotations_json(document, self:getAnnotationsForDocument(document), sdr_dir, filename)
 
     logger.dbg("AnnotationSync: remote sync of " .. json_path .. " (force=" .. tostring(is_manual) .. ")")
+    local sync_success = false
     remote.sync_annotations(self.plugin, document, json_path, function(success, merged_list)
+        sync_success = success
         self:_onSyncComplete(document, success, merged_list)
     end, is_manual)
+    return sync_success
 end
 
 function SyncManager:changedDocumentsFile()

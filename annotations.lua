@@ -16,9 +16,41 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
     local last_sync_map = utils.read_json(last_sync_file)
     local income_map = utils.read_json(income_file)
 
-    if not local_map or not last_sync_map or not income_map then
-        logger.warn("AnnotationSync: Failed to load one or more sync files. Aborting to prevent data loss.")
+    if not local_map or not last_sync_map then
+        logger.warn("AnnotationSync: Failed to load local sync files. Aborting to prevent data loss.")
         return false
+    end
+
+    if not income_map then
+        -- If income_file is not a valid JSON table, it might be a 404 error page from WebDAV (first sync)
+        -- We only assume empty state if it's NOT valid JSON at all and looks like an error body.
+        local is_likely_404 = false
+        local f = io.open(income_file, "r")
+        if f then
+            local content = f:read(1024)
+            f:close()
+            
+            -- Check if it's valid JSON (any type). If it is valid JSON but not a table, 
+            -- it's corrupted/unexpected data, so we don't treat it as a 404.
+            local ok_json = pcall(json.decode, content)
+            if not ok_json then
+                -- Not valid JSON. Check for common 404/Error markers (HTML or short text).
+                if content and (content:find("^%s*<") or #content < 200) then
+                    is_likely_404 = true
+                end
+            end
+        else
+            -- File doesn't exist at all (SyncService handles this, but just in case)
+            is_likely_404 = true
+        end
+
+        if is_likely_404 then
+            logger.info("AnnotationSync: income_file invalid/text, assuming empty remote state (likely 404).")
+            income_map = {}
+        else
+            logger.warn("AnnotationSync: income_file appears corrupted (invalid JSON). Aborting to prevent data loss.")
+            return false
+        end
     end
 
     -- Mark deleted annotations in local_map
