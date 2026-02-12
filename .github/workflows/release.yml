@@ -1,0 +1,56 @@
+name: Manual Plugin Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: get_version
+        run: |
+          VERSION=$(sed -n 's/.*version = "\(.*\)".*/\1/p' _meta.lua)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Assemble plugin directory
+        run: |
+          mkdir AnnotationSync.koplugin
+          # Use rsync style or just copy all and remove. 
+          # Since it is a fresh checkout, we copy everything.
+          cp -r . AnnotationSync.koplugin/ || true
+          
+          # Remove excluded folders
+          rm -rf AnnotationSync.koplugin/.git
+          rm -rf AnnotationSync.koplugin/.github
+          rm -rf AnnotationSync.koplugin/conductor
+          rm -rf AnnotationSync.koplugin/spec
+          rm -rf AnnotationSync.koplugin/tests
+          
+          # Remove excluded files
+          rm -f AnnotationSync.koplugin/run_tests.sh
+          rm -f AnnotationSync.koplugin/.luacheckrc
+          rm -f AnnotationSync.koplugin/.editorconfig
+          rm -f AnnotationSync.koplugin/Makefile
+          
+          # Remove the staging directory itself from within itself if cp copied it
+          rm -rf AnnotationSync.koplugin/AnnotationSync.koplugin
+
+      - name: Zip plugin
+        run: |
+          zip -r AnnotationSync.koplugin.zip AnnotationSync.koplugin
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          draft: true
+          files: AnnotationSync.koplugin.zip
