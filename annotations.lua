@@ -32,12 +32,15 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
             
             -- Check if it's valid JSON (any type). If it is valid JSON but not a table, 
             -- it's corrupted/unexpected data, so we don't treat it as a 404.
-            local ok_json = pcall(json.decode, content)
+            local ok_json, data = pcall(json.decode, content)
             if not ok_json then
                 -- Not valid JSON. Check for common 404/Error markers (HTML or short text).
                 if content and (content:find("^%s*<") or #content < 200) then
                     is_likely_404 = true
                 end
+            elseif type(data) == "table" and data.error_summary and data.error_summary:find("path/not_found") then
+                -- Dropbox error: path not found (new book)
+                is_likely_404 = true
             end
         else
             -- File doesn't exist at all (SyncService handles this, but just in case)
