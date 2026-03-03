@@ -134,4 +134,117 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         -- FAILURE EXPECTED HERE: if timestamps are identical, remote win (deletion)
         assert.is_equal(1, #merged_list, "Annotation should stay restored even if timestamps are identical")
     end)
+
+    it("reproduces 'Delayed JSON Flush' (Metadata Inconsistency)", function()
+        -- 1. Sync an annotation and then delete it remotely
+        local ann, key = create_ann_from_db(1, "Initial", "2026-01-01 12:00:00")
+        table.insert(readerui.annotation.annotations, ann)
+        
+        SyncService.sync = function(server, local_path, callback)
+            callback(local_path, local_path, local_path)
+            return true
+        end
+        sync_instance:manualSync()
+
+        -- Remote Deletion
+        local ann_del = util.tableDeepCopy(ann)
+        ann_del.deleted = true
+        ann_del.datetime_updated = "2026-01-01 13:00:00"
+        local income_path = test_utils.write_mock_json(test_data_dir, "income.json", { [key] = ann_del })
+        local last_sync_path = test_utils.write_mock_json(test_data_dir, "last.json", { [key] = ann })
+
+        SyncService.sync = function(server, local_path, callback)
+            callback(local_path, last_sync_path, income_path)
+            return true
+        end
+        sync_instance:manualSync()
+        assert.is_equal(0, #readerui.annotation.annotations)
+
+        -- 2. Restore locally
+        local deleted = sync_instance.manager:getDeletedAnnotations(readerui.document)
+        assert.is_equal(1, #deleted)
+        sync_instance:restoreAnnotation(deleted[1], true)
+        assert.is_equal(1, #readerui.annotation.annotations)
+
+        -- 3. Verify sidecar JSON on disk
+        local sdr_dir = require("frontend/docsettings"):getSidecarDir(readerui.document.file)
+        local filename = sync_instance.manager:_getAnnotationFilename(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. filename
+        
+        local f = io.open(json_path, "r")
+        local disk_map = json.decode(f:read("*a"))
+        f:close()
+        
+        -- BUG REPRODUCTION: The annotation on disk STILL has deleted=true
+        -- (because restoreAnnotation forgot to call manager:writeAnnotationsJSON)
+        assert.is_false(disk_map[key].deleted, "Disk JSON should have updated 'deleted' status after restoration")
+    end)
+
+    it("reproduces 'Menu Ghosting' (Metadata Inconsistency)", function()
+        -- 1. Setup a deleted annotation
+        local ann, key = create_ann_from_db(1, "Initial", "2026-01-01 12:00:00")
+        ann.deleted = true
+        local sdr_dir = require("frontend/docsettings"):getSidecarDir(readerui.document.file)
+        local filename = sync_instance.manager:_getAnnotationFilename(readerui.document.file)
+        annotations_mod.write_annotations_json(readerui.document, { ann }, sdr_dir, filename)
+
+        -- 2. Restore it
+        local deleted = sync_instance.manager:getDeletedAnnotations(readerui.document)
+        assert.is_equal(1, #deleted)
+        sync_instance:restoreAnnotation(deleted[1], true)
+
+        -- 3. Check if it's still in the 'Deleted' list
+        -- (BUG: manager:getDeletedAnnotations reads from disk, which is stale)
+        local still_deleted = sync_instance.manager:getDeletedAnnotations(readerui.document)
+        assert.is_equal(0, #still_deleted, "Annotation should not be listed as deleted after restoration")
+    end)
+
+    it("reproduces 'Sync Collision' (Metadata Inconsistency)", function()
+        -- 1. Setup: Sync an annotation, then delete it remotely
+        local ann, key = create_ann_from_db(1, "Initial", "2026-01-01 12:00:00")
+        table.insert(readerui.annotation.annotations, ann)
+        
+        SyncService.sync = function(server, local_path, callback)
+            callback(local_path, local_path, local_path)
+            return true
+        end
+        sync_instance:manualSync()
+
+        local ann_del = util.tableDeepCopy(ann)
+        ann_del.deleted = true
+        ann_del.datetime_updated = "2026-01-01 13:00:00"
+        local income_path = test_utils.write_mock_json(test_data_dir, "income.json", { [key] = ann_del })
+        local last_sync_path = test_utils.write_mock_json(test_data_dir, "last.json", { [key] = ann })
+
+        SyncService.sync = function(server, local_path, callback)
+            callback(local_path, last_sync_path, income_path)
+            return true
+        end
+        sync_instance:manualSync()
+
+        -- 2. Restore locally
+        local deleted = sync_instance.manager:getDeletedAnnotations(readerui.document)
+        sync_instance:restoreAnnotation(deleted[1], true)
+
+        -- 3. Trigger immediate sync
+        -- We want to see if syncDocument correctly refreshes the disk JSON
+        -- before sending it to the sync service.
+        
+        -- Mock sync service to check the CONTENT of local_path
+        SyncService.sync = function(server, local_path, callback)
+            local f = io.open(local_path, "r")
+            local local_content = json.decode(f:read("*a"))
+            f:close()
+            
+            -- If the bug exists, local_content[key].deleted might still be true
+            -- because restoreAnnotation didn't flush to JSON.
+            -- BUT syncDocument CALLS write_annotations_json, so it might BE fixed there.
+            assert.is_false(local_content[key].deleted, "Sync should use updated local state (not stale disk JSON)")
+            
+            callback(local_path, last_sync_path, income_path)
+            return true
+        end
+        
+        sync_instance:manualSync()
+    end)
 end)
