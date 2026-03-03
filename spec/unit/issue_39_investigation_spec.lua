@@ -26,6 +26,14 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         local logger = require("logger")
         logger:setLevel(logger.levels.dbg)
 
+        _G.old_os_date = os.date
+        os.date = function(fmt, time)
+            if fmt == "%Y-%m-%d %H:%M:%S" and not time then
+                return "2026-01-01 12:00:00"
+            end
+            return _G.old_os_date(fmt, time)
+        end
+
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
 
@@ -41,6 +49,7 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         if readerui then readerui:onClose() end
         test_utils.teardown_test_env(test_data_dir, old_getDataDir)
         require("ui/widget/imageviewer").new = _G.old_ImageViewer_new
+        os.date = _G.old_os_date
         UIManager:quit()
         package.loaded["main"] = nil
     end)
@@ -71,6 +80,7 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
     it("reproduces re-deletion if timestamps are identical (Hypothesis: latest-wins preference)", function()
         -- 1. Initial State: Sync an annotation
         local ann, key = create_ann_from_db(1, "Initial", "2026-01-01 12:00:00")
+        print("Expected Key: " .. key)
         table.insert(readerui.annotation.annotations, ann)
         
         SyncService.sync = function(server, local_path, callback)
