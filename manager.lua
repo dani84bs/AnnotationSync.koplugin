@@ -176,16 +176,25 @@ end
 
 -- Helper to get a document object by file path
 function SyncManager:getDocumentByFile(file)
-    -- If only the current document is available, return it if it matches.
+    -- If the current document is available, return it if it matches.
     local document = self.plugin.ui and self.plugin.ui.document
     if document and document.file == file then
         return document
     end
-    document = DocumentRegistry:openDocument(file)
-    -- crengine documents must be rendered in order to use their XPointer functions
-    if document.provider == "crengine" then
-        logger.dbg("AnnotationSync: rendering: " .. file)
-        document:render()
+    -- Otherwise open the document with the correct provider in order to use
+    -- its `comparePositions()` function.
+    local provider = DocumentRegistry:getProvider(file)
+    if provider then
+        logger.dbg("AnnotationSync: provider for " .. file .. ": " .. provider.provider)
+        document = DocumentRegistry:openDocument(file, provider)
+        -- A document provided by crengine must be rendered in order to use
+        -- any functions that rely on XPointers.
+        if provider.provider == "crengine" then
+            if document then
+                logger.dbg("AnnotationSync: rendering: " .. file)
+                document:render()
+            end
+        end
     end
     return document
 end
