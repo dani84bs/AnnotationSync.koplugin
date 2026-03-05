@@ -21,30 +21,59 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
         return false
     end
 
+    if income_map then
+        -- Validate it's an annotation map (heuristic: values must be tables)
+        -- AND for non-empty maps, at least one entry must have annotation-like keys.
+        local has_data = false
+        local is_valid_schema = true
+        for k, v in pairs(income_map) do
+            has_data = true
+            if type(v) ~= "table" then
+                logger.warn("AnnotationSync: income_map contains non-table value for key " .. tostring(k) .. ". Aborting.")
+                is_valid_schema = false
+                break
+            end
+            -- Schema check: values should have at least one of these keys
+            if not (v.datetime_updated or v.datetime or v.page or v.text) then
+                logger.warn("AnnotationSync: income_map value for key " .. tostring(k) .. " lacks annotation metadata. Aborting.")
+                is_valid_schema = false
+                break
+            end
+        end
+        if not is_valid_schema then
+            income_map = nil
+        end
+    end
+
     if not income_map then
         -- If income_file is not a valid JSON table, it might be a 404 error page from WebDAV (first sync)
-        -- We only assume empty state if it's NOT valid JSON at all and looks like an error body.
+        -- We only assume empty state if it's NOT valid JSON at all and looks like a 404 error body.
         local is_likely_404 = false
+        local content_snippet = ""
         local f = io.open(income_file, "r")
-        local content = nil
         if f then
-            content = f:read(1024)
+            local content = f:read(1024)
             f:close()
-        end
-
-        if content and utils.isPossiblyJson(content) then
-            -- Check if it's valid JSON (any type). If it is valid JSON but not a table,
-            -- it's corrupted/unexpected data, so we don't treat it as a 404.
+            content_snippet = content and content:sub(1, 100):gsub("%s+", " ") or ""
+            
             local ok_json, data = pcall(json.decode, content)
-               -- Not valid JSON with signs of common 404/Error markers: HTML tags or short text
-            if (not ok_json and (content:find("^%s*<") or #content < 200))
+            if not ok_json then
+                -- Not valid JSON. Check for explicit 404/Not Found markers.
+                if content then
+                    local lower_content = content:lower()
+                    if lower_content:find("404") or 
+                       lower_content:find("not found") or 
+                       lower_content:find("notfound") or
+                       lower_content:find("could not be located") then
+                        is_likely_404 = true
+                    end
+                end
+            elseif type(data) == "table" and data.error_summary and data.error_summary:find("path/not_found") then
                 -- Dropbox error: path not found (new book)
-                or (type(data) == "table" and data.error_summary and data.error_summary:find("path/not_found")) then
                 is_likely_404 = true
             end
         else
-            -- File doesn't exist at all (SyncService should handle this, but just in case)
-            -- or contents do not look like JSON.
+            -- File doesn't exist at all (SyncService handles this, but just in case)
             is_likely_404 = true
         end
 
@@ -52,7 +81,7 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
             logger.info("AnnotationSync: income_file invalid/text, assuming empty remote state (likely 404).")
             income_map = {}
         else
-            logger.warn("AnnotationSync: income_file appears corrupted (invalid JSON). Aborting to prevent data loss.")
+            logger.warn("AnnotationSync: income_file appears corrupted or server error. Aborting. Snippet: " .. content_snippet)
             return false
         end
     end
