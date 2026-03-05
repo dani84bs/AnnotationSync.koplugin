@@ -111,21 +111,19 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         
         -- Let's MOCK the timestamp to be EXACTLY SAME as the remote deletion
         -- to see how the merge logic handles it.
-        readerui.annotation.annotations[1].datetime_updated = "2026-01-01 13:00:00"
-        readerui.annotation.annotations[1].datetime = "2026-01-01 13:00:00"
+        local restored_ann = readerui.annotation.annotations[1]
+        restored_ann.datetime_updated = "2026-01-01 13:00:00"
+        restored_ann.datetime = "2026-01-01 13:00:00"
 
-        -- 4. Sync again
-        -- sync_callback will see:
-        -- income_v: deleted=true, time=13:00
-        -- local_v:  deleted=false (active), time=13:00
-        
-        -- M.is_before(income_v, local_v) will be false (since 13:00 < 13:00 is false)
-        -- SO it will pick merged[income_k] = income_v (the DELETED one!)
-        
         local sdr_dir = require("frontend/docsettings"):getSidecarDir(readerui.document.file)
         local filename = sync_instance.manager:_getAnnotationFilename(readerui.document.file)
         local local_path = sdr_dir .. "/" .. filename
         local sync_path = local_path .. ".sync"
+
+        -- IMPORTANT: sync_callback reads from DISK, so we must flush the mock timestamp to JSON
+        annotations_mod.write_annotations_json(readerui.document, { restored_ann }, sdr_dir, filename)
+
+        -- 4. Sync again
         
         -- We manually call sync_callback to see the result
         local ok, merged_list = annotations_mod.sync_callback(readerui.document, local_path, sync_path, income_path, false)
