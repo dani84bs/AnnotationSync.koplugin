@@ -56,6 +56,23 @@ function SyncManager:syncDocument(document, is_manual)
     self:_flushSettings()
     logger.dbg("AnnotationSync: syncing document: " .. file)
 
+    local json_path = self:writeAnnotationsJSON(document)
+    if not json_path then return false end
+
+    logger.dbg("AnnotationSync: remote sync of " .. json_path .. " (force=" .. tostring(is_manual) .. ")")
+    local sync_success = false
+    remote.sync_annotations(self.plugin, document, json_path, function(success, merged_list)
+        sync_success = success
+        self:_onSyncComplete(document, success, merged_list)
+    end, is_manual)
+    return sync_success
+end
+
+-- Refreshes the local sync JSON file with latest memory/sidecar state
+function SyncManager:writeAnnotationsJSON(document)
+    local file = document and document.file
+    if not file then return false end
+
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then return false end
 
@@ -66,17 +83,7 @@ function SyncManager:syncDocument(document, is_manual)
     end
 
     local filename = self:_getAnnotationFilename(file)
-    local json_path = sdr_dir .. "/" .. filename
-
-    annotations.write_annotations_json(document, self:getAnnotationsForDocument(document), sdr_dir, filename)
-
-    logger.dbg("AnnotationSync: remote sync of " .. json_path .. " (force=" .. tostring(is_manual) .. ")")
-    local sync_success = false
-    remote.sync_annotations(self.plugin, document, json_path, function(success, merged_list)
-        sync_success = success
-        self:_onSyncComplete(document, success, merged_list)
-    end, is_manual)
-    return sync_success
+    return annotations.write_annotations_json(document, self:getAnnotationsForDocument(document), sdr_dir, filename)
 end
 
 function SyncManager:changedDocumentsFile()
