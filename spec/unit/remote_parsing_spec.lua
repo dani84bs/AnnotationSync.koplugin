@@ -39,6 +39,20 @@ describe("Remote Response Parsing (Issue #39)", function()
         assert.is_table(merged)
     end)
 
+    it("accepts SabreDAV XML error as empty remote state", function()
+        local sabre_xml = '<?xml version="1.0" encoding="utf-8"?> <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"> <s:exception>Sabre\\DAV\\Exception\\NotFound</s:exception> <s:message>File with name annots/9b6b3500ac06199cb8a8b3a46c73d963.json could not be located</s:message> </d:error>'
+        local ok, merged = run_sync_callback(sabre_xml)
+        assert.is_true(ok, "Should accept SabreDAV XML as 404")
+        assert.is_table(merged)
+    end)
+
+    it("aborts on valid JSON that is not an annotation map (schema check)", function()
+        -- Current logic might treat this as valid JSON and then crash/fail during merge
+        local invalid_schema_json = '{"status": "ok", "count": 0}'
+        local ok, merged = run_sync_callback(invalid_schema_json)
+        assert.is_false(ok, "Should abort on non-annotation JSON schema")
+    end)
+
     it("aborts on random HTML error page (NOT 404)", function()
         -- Current logic might treat this as 404 because it starts with '<'
         local html_500 = "<html><head><title>500 Internal Server Error</title></head><body>Something went wrong</body></html>"
