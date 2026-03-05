@@ -15,6 +15,12 @@ function M.read_json(path)
     if not content or content == "" then
         return {}
     end
+
+    -- json.decode can cause a panic and crash KOReader on some platforms if it
+    -- tries to parse HTML, even in a `pcall()`
+    if not M.isPossiblyJson(content) then
+        return nil
+    end
     local ok, data = pcall(json.decode, content)
     if ok and type(data) == "table" then
         if data.error_summary or (data.error and type(data.error) == "table") then
@@ -34,6 +40,11 @@ function M.insert_after_statistics(key)
         end
     end
     table.insert(reader_order.tools, pos, key)
+end
+
+function M.isPossiblyJson(content)
+    local doesStartWithBracket = content:sub(1, #"{") == "{"
+    return doesStartWithBracket
 end
 
 function M.show_msg(msg)
