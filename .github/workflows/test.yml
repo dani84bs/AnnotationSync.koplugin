@@ -35,6 +35,7 @@ jobs:
         with:
           repository: koreader/koreader
           path: koreader_core
+          ref: v2025.10
           fetch-depth: 0
 
       - name: Checkout AnnotationSync Plugin
