@@ -26,24 +26,25 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
         -- We only assume empty state if it's NOT valid JSON at all and looks like an error body.
         local is_likely_404 = false
         local f = io.open(income_file, "r")
+        local content = nil
         if f then
-            local content = f:read(1024)
+            content = f:read(1024)
             f:close()
-            
-            -- Check if it's valid JSON (any type). If it is valid JSON but not a table, 
+        end
+
+        if content and utils.isPossiblyJson(content) then
+            -- Check if it's valid JSON (any type). If it is valid JSON but not a table,
             -- it's corrupted/unexpected data, so we don't treat it as a 404.
             local ok_json, data = pcall(json.decode, content)
-            if not ok_json then
-                -- Not valid JSON. Check for common 404/Error markers (HTML or short text).
-                if content and (content:find("^%s*<") or #content < 200) then
-                    is_likely_404 = true
-                end
-            elseif type(data) == "table" and data.error_summary and data.error_summary:find("path/not_found") then
+               -- Not valid JSON with signs of common 404/Error markers: HTML tags or short text
+            if (not ok_json and (content:find("^%s*<") or #content < 200))
                 -- Dropbox error: path not found (new book)
+                or (type(data) == "table" and data.error_summary and data.error_summary:find("path/not_found")) then
                 is_likely_404 = true
             end
         else
-            -- File doesn't exist at all (SyncService handles this, but just in case)
+            -- File doesn't exist at all (SyncService should handle this, but just in case)
+            -- or contents do not look like JSON.
             is_likely_404 = true
         end
 
