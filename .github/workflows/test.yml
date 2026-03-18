@@ -49,6 +49,19 @@ jobs:
           cd koreader_core
           git submodule status --recursive
 
+      - name: Install SDL3 Build Dependencies
+        run: |
+          # The kobase image might be missing newer SDL3 dependencies
+          # We update apt and install the required X11 and Wayland dev libraries
+          # We also install other common SDL3 deps suggested by SDL3 README
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxext-dev libxcursor-dev libxinerama-dev libxi-dev \
+            libxrandr-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev \
+            libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libibus-1-dev libudev-dev libpipewire-0.3-dev \
+            libasound2-dev libpulse-dev
+
       - name: Generate Cache Key
         run: |
           cd koreader_core
