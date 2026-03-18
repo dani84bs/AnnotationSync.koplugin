@@ -108,7 +108,8 @@ describe("AnnotationSync Automation & Settings", function()
                 if file == doc1 then return readerui.document end
                 return { 
                     file = file, provider = "crengine", render = function() end,
-                    compareXPointers = function(self_doc, a, b) return 0 end
+                    compareXPointers = function(self_doc, a, b) return 0 end,
+                    close = function() end,
                 }
             end
             

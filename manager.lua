@@ -31,12 +31,23 @@ function SyncManager:syncAllChangedDocuments()
         return
     end
     local count = 0
+    local ui_document = self.plugin.ui and self.plugin.ui.document
     for file, _ in pairs(changed_docs) do
         -- Try to get a document object for this file, open if needed
+        logger.info("AnnotationSync: opening document for batch sync: " .. file)
         local document = self:getDocumentByFile(file)
         if document then
-            if self:syncDocument(document, false) then
+            local is_temporary = (document ~= ui_document)
+            local ok, success = pcall(self.syncDocument, self, document, false)
+            if ok and success then
                 count = count + 1
+            elseif not ok then
+                logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(success))
+            end
+
+            if is_temporary then
+                logger.info("AnnotationSync: closing temporary document: " .. file)
+                document:close()
             end
         end
     end
