@@ -44,6 +44,11 @@ jobs:
         with:
           path: koreader_core/plugins/AnnotationSync.koplugin
 
+      - name: Submodule Status (Diagnostic)
+        run: |
+          cd koreader_core
+          git submodule status --recursive
+
       - name: Generate Cache Key
         run: |
           cd koreader_core
@@ -82,6 +87,8 @@ jobs:
       - name: Build Base (Needed for tests)
         run: |
           cd koreader_core
+          # Ensure submodules are recursively updated to match the core commit
+          git submodule update --init --recursive base
           # Use --assume-old=base if we have a cached build to avoid unnecessary rebuilds
           if [ -d build ]; then
             make base --assume-old=base
