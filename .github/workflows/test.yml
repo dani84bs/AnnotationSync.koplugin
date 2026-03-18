@@ -59,7 +59,7 @@ jobs:
             libx11-dev libxext-dev libxcursor-dev libxinerama-dev libxi-dev \
             libxrandr-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev \
             libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev \
-            libdbus-1-dev libibus-1-dev libudev-dev libpipewire-0.3-dev \
+            libdbus-1-dev libudev-dev \
             libasound2-dev libpulse-dev
 
       - name: Generate Cache Key
