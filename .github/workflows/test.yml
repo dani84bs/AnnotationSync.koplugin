@@ -37,6 +37,7 @@ jobs:
           path: koreader_core
           ref: v2026.03
           fetch-depth: 0
+          submodules: recursive
 
       - name: Checkout AnnotationSync Plugin
         uses: actions/checkout@v4
