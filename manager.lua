@@ -31,12 +31,31 @@ function SyncManager:syncAllChangedDocuments()
         return
     end
     local count = 0
+    local ui_document = self.plugin.ui and self.plugin.ui.document
     for file, _ in pairs(changed_docs) do
         -- Try to get a document object for this file, open if needed
         local document = self:getDocumentByFile(file)
         if document then
-            if self:syncDocument(document, false) then
+            logger.info("AnnotationSync: syncing document: " .. file)
+            local is_temporary = (document ~= ui_document)
+            local ok, success = pcall(self.syncDocument, self, document, false)
+            if ok and success then
                 count = count + 1
+            elseif not ok then
+                logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(success))
+            end
+
+            if is_temporary then
+                logger.info("AnnotationSync: closing temporary document: " .. file)
+                document:close()
+            end
+        else
+            -- Check if file still exists
+            if not util.fileExists(file) then
+                logger.warn("AnnotationSync: file missing, removing from sync list: " .. file)
+                self:removeFromChangedDocumentsFileByPath(file)
+            else
+                logger.warn("AnnotationSync: could not open document for sync: " .. file)
             end
         end
     end
@@ -121,6 +140,11 @@ end
 
 function SyncManager:removeFromChangedDocumentsFile(document)
     local file = document and document.file
+    self:removeFromChangedDocumentsFileByPath(file)
+end
+
+function SyncManager:removeFromChangedDocumentsFileByPath(file)
+    if not file then return end
     local track_path = self:changedDocumentsFile()
     local ok, changed_docs = pcall(dofile, track_path)
     if ok and type(changed_docs) == "table" and changed_docs[file] then
@@ -184,12 +208,13 @@ end
 -- Helper to get a document object by file path
 function SyncManager:getDocumentByFile(file)
     -- If the current document is available, return it if it matches.
-    local document = self.plugin.ui and self.plugin.ui.document
-    if document and document.file == file then
-        return document
+    local ui_document = self.plugin.ui and self.plugin.ui.document
+    if ui_document and ui_document.file == file then
+        return ui_document
     end
     -- Otherwise open the document with the correct provider in order to use
     -- its `comparePositions()` function.
+    local document
     local provider = DocumentRegistry:getProvider(file)
     if provider then
         logger.dbg("AnnotationSync: provider for " .. file .. ": " .. provider.provider)
