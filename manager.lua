@@ -1,8 +1,12 @@
 local DocumentRegistry = require("document/documentregistry")
 local DataStorage = require("datastorage")
+local Device = require("device")
+local NetworkMgr = require("ui/network/manager")
 local util = require("util")
 local logger = require("logger")
+local json = require("json")
 local _ = require("gettext")
+local T = require("ffi/util").template
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
@@ -16,11 +20,198 @@ local SyncManager = {}
 
 function SyncManager:new(plugin)
     local o = {
-        plugin = plugin
+        plugin = plugin,
+        page_turn_counter = 0,
+        last_page = 0,
+        is_syncing = false,
     }
     setmetatable(o, self)
     self.__index = self
     return o
+end
+
+function SyncManager:onPageUpdate(page_pos)
+    if not self.plugin.settings.progress_sync then return end
+    logger.dbg("AnnotationSync: onPageUpdate event received")
+
+    local current_page = self.plugin.ui:getCurrentPage()
+    if current_page ~= self.last_page then
+        self.page_turn_counter = self.page_turn_counter + 1
+        self.last_page = current_page
+    end
+
+    if self.page_turn_counter >= self.plugin.settings.progress_sync_interval then
+        self.page_turn_counter = 0
+        self:syncProgress()
+    end
+end
+
+function SyncManager:syncProgress()
+    if self.is_syncing then return end
+    self.is_syncing = true
+
+    if not NetworkMgr:isConnected() then
+        logger.info("AnnotationSync: network is disconnected, skipping progress sync")
+        self.is_syncing = false
+        return
+    end
+
+    logger.info("AnnotationSync: starting progress sync")
+
+    local document = self.plugin.ui and self.plugin.ui.document
+    if not document then
+        self.is_syncing = false
+        return
+    end
+
+    local file = document.file
+    if not file then
+        self.is_syncing = false
+        return
+    end
+
+    local sdr_dir = docsettings:getSidecarDir(file)
+    if not sdr_dir or sdr_dir == "" then
+        self.is_syncing = false
+        return
+    end
+
+    -- Ensure the local sidecar directory exists
+    if not lfs.attributes(sdr_dir, "mode") then
+        logger.info("AnnotationSync: creating missing sidecar directory: " .. sdr_dir)
+        os.execute("mkdir -p " .. sdr_dir)
+    end
+
+    local filename = self:_getProgressFilename(file)
+    local json_path = sdr_dir .. "/" .. filename
+
+    local device_id = Device.model or "unknown"
+    local page = self.plugin.ui:getCurrentPage()
+    local total = self.plugin.ui.paging and self.plugin.ui.paging.number_of_pages or 0
+    local percentage = 0
+    if total > 0 then
+        percentage = page / total
+    elseif self.plugin.ui.paging then
+        percentage = self.plugin.ui.paging:getLastPercent()
+    end
+
+    local current_progress = {
+        page = page,
+        percentage = percentage,
+        timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+    }
+
+    local local_data = utils.read_json(json_path) or {}
+    -- Normalize if old format
+    if local_data.device and local_data.page then
+        local old_device = local_data.device
+        local_data = {
+            [old_device] = {
+                page = local_data.page,
+                percentage = local_data.percentage,
+                timestamp = local_data.timestamp,
+            }
+        }
+    end
+
+    local_data[device_id] = current_progress
+
+    local f = io.open(json_path, "w")
+    if f then
+        f:write(json.encode(local_data))
+        f:close()
+
+        logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
+        UIManager:scheduleIn(0.1, function()
+            remote.push_progress(json_path, function(success)
+                self.is_syncing = false
+                if success then
+                    logger.dbg("AnnotationSync: progress sync successful")
+                else
+                    logger.warn("AnnotationSync: progress sync failed")
+                end
+            end)
+        end)
+    else
+        logger.warn("AnnotationSync: failed to write progress JSON: " .. json_path)
+        self.is_syncing = false
+    end
+end
+
+function SyncManager:pullProgress()
+    if not NetworkMgr:isConnected() then
+        utils.show_msg(_("Network is disconnected, cannot pull progress"))
+        return
+    end
+
+    local document = self.plugin.ui and self.plugin.ui.document
+    if not document then return end
+
+    local file = document.file
+    if not file then return end
+
+    local sdr_dir = docsettings:getSidecarDir(file)
+    if not sdr_dir or sdr_dir == "" then return end
+
+    local filename = self:_getProgressFilename(file)
+    local json_path = sdr_dir .. "/" .. filename
+
+    utils.show_msg(_("Fetching remote progress..."))
+    remote.pull_progress(json_path, function(success, merged_data)
+        if success and merged_data then
+            self:showJumpMenu(merged_data)
+        else
+            utils.show_msg(_("Failed to fetch remote progress"))
+        end
+    end)
+end
+
+function SyncManager:showJumpMenu(progress_map)
+    local Menu = require("ui/widget/menu")
+    local menu_items = {}
+
+    local device_id = Device.model or "unknown"
+
+    -- Sort devices by timestamp descending
+    local devices = {}
+    for dev_id, data in pairs(progress_map) do
+        table.insert(devices, { id = dev_id, data = data })
+    end
+    table.sort(devices, function(a, b)
+        if not a.data.timestamp then return false end
+        if not b.data.timestamp then return true end
+        return a.data.timestamp > b.data.timestamp
+    end)
+
+    for idx, dev in ipairs(devices) do
+        local is_current = (dev.id == device_id)
+        local text = string.format("%s: Page %d (%.1f%%)",
+            dev.id, dev.data.page or 0, (dev.data.percentage or 0) * 100)
+        if is_current then
+            text = text .. " " .. _("(this device)")
+        end
+
+        table.insert(menu_items, {
+            text = text,
+            sub_text = dev.data.timestamp,
+            callback = function()
+                self.plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
+                UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
+                utils.show_msg(T(_("Jumped to page %1 from %2"), dev.data.page, dev.id))
+            end
+        })
+    end
+
+    if #menu_items == 0 then
+        utils.show_msg(_("No remote progress found."))
+        return
+    end
+
+    local jump_menu = Menu:new{
+        title = _("Jump to device progress"),
+        item_table = menu_items,
+    }
+    UIManager:show(jump_menu)
 end
 
 -- Sync all changed documents listed in changed_documents.lua
@@ -251,6 +442,15 @@ function SyncManager:_getAnnotationFilename(file)
     end
     local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
     return hash .. ".json"
+end
+
+function SyncManager:_getProgressFilename(file)
+    if self.plugin.settings.use_filename then
+        local filename = file:match("([^/]+)$") or file
+        return filename .. ".progress.json"
+    end
+    local hash = file and type(file) == "string" and util.partialMD5(file) or _("No hash")
+    return hash .. ".progress.json"
 end
 
 function SyncManager:_onSyncComplete(document, success, merged_list)

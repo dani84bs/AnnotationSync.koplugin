@@ -1,0 +1,226 @@
+describe("Reading Progress Sync Integration", function()
+    local ReaderUI, UIManager, SyncService, NetworkMgr, Device, Geom
+    local AnnotationSyncPlugin, test_utils, json, util
+    local readerui, sync_instance
+    local test_data_dir = os.getenv("PWD") .. "/test_progress_sync_tmp"
+    local old_getDataDir
+
+    setup(function()
+        require("commonrequire")
+        local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
+        package.path = plugin_path .. ";" .. package.path
+        
+        disable_plugins()
+        Geom = require("ui/geometry")
+        ReaderUI = require("apps/reader/readerui")
+        UIManager = require("ui/uimanager")
+        SyncService = require("apps/cloudstorage/syncservice")
+        NetworkMgr = require("ui/network/manager")
+        Device = require("device")
+        json = require("json")
+        util = require("util")
+        
+        test_utils = require("spec/unit/test_utils")
+        AnnotationSyncPlugin = require("main")
+
+        -- Mock utils globally because remote.lua is missing the require
+        _G.utils = require("utils")
+
+        old_getDataDir = test_utils.setup_test_env(test_data_dir)
+
+        G_reader_settings:saveSetting("cloud_download_dir", "http://mock-server")
+        G_reader_settings:saveSetting("cloud_server_object", json.encode({url="http://mock-server", type="webdav"}))
+
+        readerui, sync_instance = test_utils.init_integration_context(
+            "spec/front/unit/data/juliet.epub", AnnotationSyncPlugin
+        )
+    end)
+
+    teardown(function()
+        if readerui then readerui:onClose() end
+        test_utils.teardown_test_env(test_data_dir, old_getDataDir)
+        UIManager:quit()
+        package.loaded["main"] = nil
+        _G.utils = nil
+    end)
+
+    before_each(function()
+        UIManager:show(readerui)
+        fastforward_ui_events()
+        
+        -- Enable progress sync and set interval to 2 for testing
+        sync_instance.settings.progress_sync = true
+        sync_instance.settings.progress_sync_interval = 2
+        sync_instance.manager.page_turn_counter = 0
+        sync_instance.manager.last_page = 0
+        sync_instance.manager.is_syncing = false
+        
+        -- Mock Network connected by default
+        NetworkMgr.isWifiOn = function() return true end
+        NetworkMgr.isConnected = function() return true end
+        
+        -- Mock Device model
+        Device.model = "TestDevice"
+
+        -- Mock UI and paging methods to match new manager.lua implementation
+        readerui.getCurrentPage = function(this) return readerui.document.page or 1 end
+        if not readerui.paging then
+            readerui.paging = {
+                number_of_pages = 100,
+                getLastPercent = function(this) return 0.1 end
+            }
+        end
+
+        -- Mock document methods to avoid crashes
+        readerui.document.setPagePosition = function(this, page) end
+        readerui.document.gotoPage = function(this, page) this.page = page end
+        readerui.document.getPageIndex = function(this) return readerui.document.page or 1 end
+        readerui.document.getPercentage = function(this) return 0.1 end
+        readerui.document.getNativePageDimensions = function(this, pageno)
+            return Geom:new{ w = 1200, h = 1600 }
+        end
+    end)
+
+    it("increments counter and triggers sync every X pages", function()
+        local remote = require("remote")
+        local push_called = 0
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback)
+            push_called = push_called + 1
+            callback(true)
+        end
+
+        -- Page 1: counter becomes 1
+        readerui.document.page = 1
+        sync_instance:onPageUpdate()
+        assert.is_equal(0, push_called)
+        assert.is_equal(1, sync_instance.manager.page_turn_counter)
+
+        -- Page 2: counter becomes 2, triggers sync, resets to 0
+        readerui.document.page = 2
+        sync_instance:onPageUpdate()
+        fastforward_ui_events() -- Trigger scheduled sync
+        assert.is_equal(1, push_called)
+        assert.is_equal(0, sync_instance.manager.page_turn_counter)
+
+        -- Page 3: counter becomes 1
+        readerui.document.page = 3
+        sync_instance:onPageUpdate()
+        assert.is_equal(1, push_called)
+        assert.is_equal(1, sync_instance.manager.page_turn_counter)
+
+        -- Page 4: counter becomes 2, triggers sync, resets to 0
+        readerui.document.page = 4
+        sync_instance:onPageUpdate()
+        fastforward_ui_events() -- Trigger scheduled sync
+        assert.is_equal(2, push_called)
+        assert.is_equal(0, sync_instance.manager.page_turn_counter)
+
+        remote.push_progress = old_push
+    end)
+
+    it("skips sync when network is disconnected", function()
+        NetworkMgr.isConnected = function() return false end
+        
+        local remote = require("remote")
+        local push_called = 0
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback)
+            push_called = push_called + 1
+            callback(true)
+        end
+
+        -- Trigger sync (interval is 2, so 2 updates)
+        readerui.document.page = 1
+        sync_instance:onPageUpdate()
+        readerui.document.page = 2
+        sync_instance:onPageUpdate()
+        fastforward_ui_events()
+        
+        assert.is_equal(0, push_called)
+        
+        remote.push_progress = old_push
+    end)
+
+    it("stores a map of devices in progress.json", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback) callback(true) end
+
+        -- Trigger sync
+        readerui.document.page = 5
+        sync_instance:onPageUpdate()
+        readerui.document.page = 6
+        sync_instance:onPageUpdate()
+        fastforward_ui_events() -- Trigger scheduled sync
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        
+        local f = io.open(json_path, "r")
+        assert.is_not_nil(f)
+        local content = f:read("*all")
+        f:close()
+        
+        local data = json.decode(content)
+        assert.is_not_nil(data["TestDevice"])
+        assert.is_equal(6, data["TestDevice"].page)
+        assert.is_not_nil(data["TestDevice"].timestamp)
+        
+        remote.push_progress = old_push
+    end)
+
+    it("displays remote entries in jump menu and allows jumping", function()
+        local remote = require("remote")
+        local device_id = "RemoteDevice"
+        local remote_data = {
+            [device_id] = {
+                page = 10,
+                percentage = 0.5,
+                timestamp = "2026-04-14 12:00:00"
+            }
+        }
+
+        local old_pull = remote.pull_progress
+        remote.pull_progress = function(path, callback)
+            callback(true, remote_data)
+        end
+
+        local menu_shown = false
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                menu_shown = true
+                -- Simulate clicking the remote device entry
+                for _, item in ipairs(widget.item_table) do
+                    if item.text:find(device_id) then
+                        item.callback()
+                        break
+                    end
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        local jump_event_fired = false
+        local old_broadcast = UIManager.broadcastEvent
+        UIManager.broadcastEvent = function(this, event)
+            if event.handler == "onJumpToPage" and (event.args == 10 or (type(event.args) == "table" and event.args[1] == 10)) then
+                jump_event_fired = true
+            end
+            old_broadcast(this, event)
+        end
+
+        sync_instance.manager:pullProgress()
+
+        assert.is_true(menu_shown)
+        assert.is_true(jump_event_fired)
+        assert.is_equal(10, readerui.document:getPageIndex())
+
+        UIManager.show = old_UIManager_show
+        UIManager.broadcastEvent = old_broadcast
+        remote.pull_progress = old_pull
+    end)
+end)
