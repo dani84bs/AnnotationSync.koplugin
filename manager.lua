@@ -96,15 +96,19 @@ function SyncManager:syncProgress()
     end
 
     local percentage = 0
-    if total > 0 then
+    local paging_module = self.plugin.ui.paging or self.plugin.ui.rolling
+    if paging_module then
+        percentage = paging_module:getLastPercent() or 0
+    end
+
+    if percentage <= 0 and total > 0 then
         percentage = page / total
-    elseif self.plugin.ui.paging then
-        percentage = self.plugin.ui.paging:getLastPercent() or 0
     end
 
     local current_progress = {
         page = page,
         percentage = percentage,
+        pos = paging_module and paging_module.getLastProgress and paging_module:getLastProgress(),
         timestamp = os.date("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -116,6 +120,7 @@ function SyncManager:syncProgress()
             [old_device] = {
                 page = local_data.page,
                 percentage = local_data.percentage,
+                pos = local_data.pos,
                 timestamp = local_data.timestamp,
             }
         }
@@ -203,8 +208,13 @@ function SyncManager:showJumpMenu(progress_map)
             text = text,
             sub_text = dev.data.timestamp,
             callback = function()
-                self.plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
-                UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
+                if dev.data.pos then
+                    self.plugin.ui:handleEvent(Event:new("GotoPos", dev.data.pos))
+                    UIManager:broadcastEvent(Event:new("GotoPos", dev.data.pos))
+                else
+                    self.plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
+                    UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
+                end
                 utils.show_msg(T(_("Jumped to page %1 from %2"), dev.data.page, dev.id))
             end
         })

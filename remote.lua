@@ -139,6 +139,7 @@ function M._normalize_progress(data)
             [device_id] = {
                 page = data.page,
                 percentage = data.percentage,
+                pos = data.pos, -- Ensure pos is preserved
                 timestamp = data.timestamp,
             }
         }

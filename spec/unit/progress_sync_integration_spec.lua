@@ -67,8 +67,12 @@ describe("Reading Progress Sync Integration", function()
         if not readerui.paging then
             readerui.paging = {
                 number_of_pages = 100,
-                getLastPercent = function(this) return 0.1 end
+                getLastPercent = function(this) return 0 end,
+                getLastProgress = function(this) return "mock-pos-123" end
             }
+        else
+            readerui.paging.getLastPercent = function(this) return 0 end
+            readerui.paging.getLastProgress = function(this) return "mock-pos-123" end
         end
 
         -- Mock document methods to avoid crashes
@@ -173,6 +177,37 @@ describe("Reading Progress Sync Integration", function()
         remote.push_progress = old_push
     end)
 
+    it("prioritizes getLastPercent() from paging module", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback) callback(true) end
+
+        -- Mock getLastPercent to return a specific value
+        readerui.paging.getLastPercent = function(this) return 0.75 end
+        
+        -- Trigger sync
+        readerui.document.page = 10
+        -- total is 100, so manual calculation would be 0.1
+        sync_instance:onPageUpdate()
+        readerui.document.page = 11
+        sync_instance:onPageUpdate()
+        fastforward_ui_events()
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        
+        local f = io.open(json_path, "r")
+        local content = f:read("*all")
+        f:close()
+        
+        local data = json.decode(content)
+        -- Should be 0.75, not 11/100 = 0.11
+        assert.is_equal(0.75, data["TestDevice"].percentage)
+        
+        remote.push_progress = old_push
+    end)
+
     it("displays remote entries in jump menu and allows jumping", function()
         local remote = require("remote")
         local device_id = "RemoteDevice"
@@ -224,5 +259,172 @@ describe("Reading Progress Sync Integration", function()
         UIManager.show = old_UIManager_show
         UIManager.broadcastEvent = old_broadcast
         remote.pull_progress = old_pull
+    end)
+
+    it("includes 'pos' field in progress.json when available", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback) callback(true) end
+
+        -- Trigger sync
+        readerui.document.page = 5
+        sync_instance:onPageUpdate()
+        readerui.document.page = 6
+        sync_instance:onPageUpdate()
+        fastforward_ui_events() -- Trigger scheduled sync
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        
+        local f = io.open(json_path, "r")
+        assert.is_not_nil(f)
+        local content = f:read("*all")
+        f:close()
+        
+        local data = json.decode(content)
+        assert.is_not_nil(data["TestDevice"])
+        assert.is_equal("mock-pos-123", data["TestDevice"].pos)
+        
+        remote.push_progress = old_push
+    end)
+
+    it("prioritizes 'GotoPos' when 'pos' is present in remote data", function()
+        local remote = require("remote")
+        local device_id = "RemoteDevice"
+        local remote_data = {
+            [device_id] = {
+                page = 10,
+                percentage = 0.5,
+                pos = "remote-pos-456",
+                timestamp = "2026-04-14 12:00:00"
+            }
+        }
+
+        local old_pull = remote.pull_progress
+        remote.pull_progress = function(path, callback)
+            callback(true, remote_data)
+        end
+
+        local menu_shown = false
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                menu_shown = true
+                -- Simulate clicking the remote device entry
+                for _, item in ipairs(widget.item_table) do
+                    if item.text:find(device_id) then
+                        item.callback()
+                        break
+                    end
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        local goto_pos_fired = false
+        local old_broadcast = UIManager.broadcastEvent
+        UIManager.broadcastEvent = function(this, event)
+            if event.handler == "onGotoPos" and event.args[1] == "remote-pos-456" then
+                goto_pos_fired = true
+            end
+            old_broadcast(this, event)
+        end
+
+        sync_instance.manager:pullProgress()
+
+        assert.is_true(menu_shown)
+        assert.is_true(goto_pos_fired)
+
+        UIManager.show = old_UIManager_show
+        UIManager.broadcastEvent = old_broadcast
+        remote.pull_progress = old_pull
+    end)
+
+    it("falls back to 'GotoPage' when 'pos' is missing in remote data", function()
+        local remote = require("remote")
+        local device_id = "RemoteDevice"
+        local remote_data = {
+            [device_id] = {
+                page = 10,
+                percentage = 0.5,
+                timestamp = "2026-04-14 12:00:00"
+            }
+        }
+
+        local old_pull = remote.pull_progress
+        remote.pull_progress = function(path, callback)
+            callback(true, remote_data)
+        end
+
+        local menu_shown = false
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                menu_shown = true
+                -- Simulate clicking the remote device entry
+                for _, item in ipairs(widget.item_table) do
+                    if item.text:find(device_id) then
+                        item.callback()
+                        break
+                    end
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        local jump_to_page_fired = false
+        local old_broadcast = UIManager.broadcastEvent
+        UIManager.broadcastEvent = function(this, event)
+            if event.handler == "onJumpToPage" and event.args[1] == 10 then
+                jump_to_page_fired = true
+            end
+            old_broadcast(this, event)
+        end
+
+        sync_instance.manager:pullProgress()
+
+        assert.is_true(menu_shown)
+        assert.is_true(jump_to_page_fired)
+
+        UIManager.show = old_UIManager_show
+        UIManager.broadcastEvent = old_broadcast
+        remote.pull_progress = old_pull
+    end)
+
+    it("retrieves progress from rolling module when paging is missing", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress
+        remote.push_progress = function(path, callback) callback(true) end
+
+        -- Remove paging and add rolling
+        readerui.paging = nil
+        readerui.rolling = {
+            getLastPercent = function(this) return 0.88 end,
+            getLastProgress = function(this) return "rolling-pos-789" end
+        }
+        
+        -- Trigger sync
+        readerui.document.page = 20
+        sync_instance:onPageUpdate()
+        readerui.document.page = 21
+        sync_instance:onPageUpdate()
+        fastforward_ui_events()
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        
+        local f = io.open(json_path, "r")
+        local content = f:read("*all")
+        f:close()
+        
+        local data = json.decode(content)
+        assert.is_equal(0.88, data["TestDevice"].percentage)
+        assert.is_equal("rolling-pos-789", data["TestDevice"].pos)
+        
+        remote.push_progress = old_push
     end)
 end)
