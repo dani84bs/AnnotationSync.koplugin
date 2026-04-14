@@ -87,12 +87,19 @@ function SyncManager:syncProgress()
 
     local device_id = Device.model or "unknown"
     local page = self.plugin.ui:getCurrentPage()
-    local total = self.plugin.ui.paging and self.plugin.ui.paging.number_of_pages or 0
+    local total = 0
+    if self.plugin.ui.paging then
+        total = self.plugin.ui.paging.number_of_pages or 0
+    end
+    if total <= 0 and self.plugin.ui.document then
+        total = self.plugin.ui.document:getPageCount() or 0
+    end
+
     local percentage = 0
     if total > 0 then
         percentage = page / total
     elseif self.plugin.ui.paging then
-        percentage = self.plugin.ui.paging:getLastPercent()
+        percentage = self.plugin.ui.paging:getLastPercent() or 0
     end
 
     local current_progress = {
@@ -185,8 +192,9 @@ function SyncManager:showJumpMenu(progress_map)
 
     for idx, dev in ipairs(devices) do
         local is_current = (dev.id == device_id)
-        local text = string.format("%s: Page %d (%.1f%%)",
-            dev.id, dev.data.page or 0, (dev.data.percentage or 0) * 100)
+        local percentage = (dev.data.percentage or 0) * 100
+        local text = string.format("%s: Page %d (%d%%)",
+            dev.id, dev.data.page or 0, math.floor(percentage + 0.5))
         if is_current then
             text = text .. " " .. _("(this device)")
         end

@@ -167,6 +167,8 @@ describe("Reading Progress Sync Integration", function()
         assert.is_not_nil(data["TestDevice"])
         assert.is_equal(6, data["TestDevice"].page)
         assert.is_not_nil(data["TestDevice"].timestamp)
+        -- 6 / 100 = 0.06
+        assert.is_equal(0.06, data["TestDevice"].percentage)
         
         remote.push_progress = old_push
     end)
