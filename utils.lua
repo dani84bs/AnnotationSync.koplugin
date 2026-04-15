@@ -43,8 +43,8 @@ function M.insert_after_statistics(key)
 end
 
 function M.isPossiblyJson(content)
-    local doesStartWithBracket = content:sub(1, #"{") == "{"
-    return doesStartWithBracket
+    local first_char = content:sub(1, 1)
+    return first_char == "{" or first_char == "["
 end
 
 function M.show_msg(msg)
