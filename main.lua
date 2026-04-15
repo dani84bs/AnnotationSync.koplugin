@@ -246,7 +246,7 @@ end
 
 function AnnotationSyncPlugin:showDeletedAnnotations()
     local document = self.ui and self.ui.document
-    if not document or not ann then return end
+    if not document then return end
 
     local deleted = self.manager:getDeletedAnnotations(document)
     if #deleted == 0 then
@@ -311,7 +311,7 @@ end
 
 function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
     local document = self.ui and self.ui.document
-    if not document or not ann then return end
+    if not document then return end
 
     -- 1. Mark as not deleted and update timestamp
     ann.deleted = false
