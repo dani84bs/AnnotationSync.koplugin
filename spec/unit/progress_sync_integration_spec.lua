@@ -88,8 +88,8 @@ describe("Reading Progress Sync Integration", function()
     it("increments counter and triggers sync every X pages", function()
         local remote = require("remote")
         local push_called = 0
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback)
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback)
             push_called = push_called + 1
             callback(true)
         end
@@ -120,7 +120,7 @@ describe("Reading Progress Sync Integration", function()
         assert.is_equal(2, push_called)
         assert.is_equal(0, sync_instance.manager.page_turn_counter)
 
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 
     it("skips sync when network is disconnected", function()
@@ -128,8 +128,8 @@ describe("Reading Progress Sync Integration", function()
         
         local remote = require("remote")
         local push_called = 0
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback)
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback)
             push_called = push_called + 1
             callback(true)
         end
@@ -143,13 +143,13 @@ describe("Reading Progress Sync Integration", function()
         
         assert.is_equal(0, push_called)
         
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 
     it("stores a map of devices in progress.json", function()
         local remote = require("remote")
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback) callback(true) end
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback) callback(true) end
 
         -- Trigger sync
         readerui.document.page = 5
@@ -174,13 +174,13 @@ describe("Reading Progress Sync Integration", function()
         -- 6 / 100 = 0.06
         assert.is_equal(0.06, data["TestDevice"].percentage)
         
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 
     it("prioritizes getLastPercent() from paging module", function()
         local remote = require("remote")
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback) callback(true) end
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback) callback(true) end
 
         -- Mock getLastPercent to return a specific value
         readerui.paging.getLastPercent = function(this) return 0.75 end
@@ -205,7 +205,7 @@ describe("Reading Progress Sync Integration", function()
         -- Should be 0.75, not 11/100 = 0.11
         assert.is_equal(0.75, data["TestDevice"].percentage)
         
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 
     it("displays remote entries in jump menu and allows jumping", function()
@@ -263,8 +263,8 @@ describe("Reading Progress Sync Integration", function()
 
     it("includes 'pos' field in progress.json when available", function()
         local remote = require("remote")
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback) callback(true) end
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback) callback(true) end
 
         -- Trigger sync
         readerui.document.page = 5
@@ -286,7 +286,7 @@ describe("Reading Progress Sync Integration", function()
         assert.is_not_nil(data["TestDevice"])
         assert.is_equal("mock-pos-123", data["TestDevice"].pos)
         
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 
     it("prioritizes 'GotoPos' when 'pos' is present in remote data", function()
@@ -396,8 +396,8 @@ describe("Reading Progress Sync Integration", function()
 
     it("retrieves progress from rolling module when paging is missing", function()
         local remote = require("remote")
-        local old_push = remote.push_progress
-        remote.push_progress = function(path, callback) callback(true) end
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(path, callback) callback(true) end
 
         -- Remove paging and add rolling
         readerui.paging = nil
@@ -425,6 +425,6 @@ describe("Reading Progress Sync Integration", function()
         assert.is_equal(0.88, data["TestDevice"].percentage)
         assert.is_equal("rolling-pos-789", data["TestDevice"].pos)
         
-        remote.push_progress = old_push
+        remote.push_progress_bg = old_push
     end)
 end)
