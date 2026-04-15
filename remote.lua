@@ -41,6 +41,32 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
     end
 end
 
+function M._sync_progress_callback(local_file, cached_file, income_file)
+    local local_data = utils.read_json(local_file) or {}
+    local income_data = utils.read_json(income_file) or {}
+
+    local_data = M._normalize_progress(local_data)
+    income_data = M._normalize_progress(income_data)
+
+    local changed = false
+    for device_id, data in pairs(income_data) do
+        if not local_data[device_id] or (data.timestamp or "") > (local_data[device_id].timestamp or "") then
+            local_data[device_id] = data
+            changed = true
+        end
+    end
+
+    if changed then
+        local f = io.open(local_file, "w")
+        if f then
+            f:write(json.encode(local_data))
+            f:close()
+        end
+    end
+
+    return true, local_data
+end
+
 function M.push_progress(widget, json_path, on_complete)
     if not widget.ui.cloudstorage then
         if on_complete then
@@ -52,33 +78,43 @@ function M.push_progress(widget, json_path, on_complete)
     local server = widget.settings.sync_server
     if server then
         widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
-            local local_data = utils.read_json(local_file) or {}
-            local income_data = utils.read_json(income_file) or {}
-
-            local_data = M._normalize_progress(local_data)
-            income_data = M._normalize_progress(income_data)
-
-            local changed = false
-            for device_id, data in pairs(income_data) do
-                if not local_data[device_id] or (data.timestamp or "") > (local_data[device_id].timestamp or "") then
-                    local_data[device_id] = data
-                    changed = true
-                end
-            end
-
-            if changed then
-                local f = io.open(local_file, "w")
-                if f then
-                    f:write(json.encode(local_data))
-                    f:close()
-                end
-            end
-
+            local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
             if on_complete then
-                on_complete(true)
+                on_complete(success)
             end
-            return true
+            return success
         end, true) -- is_silent = true
+    else
+        if on_complete then
+            on_complete(false)
+        end
+    end
+end
+
+function M.push_progress_bg(widget, json_path, on_complete)
+    if not widget.ui.cloudstorage then
+        if on_complete then
+            on_complete(false)
+        end
+        return
+    end
+
+    local server = widget.settings.sync_server
+    if server then
+        local Trapper = require("ui/trapper")
+        Trapper:wrap(function()
+            local completed, success = Trapper:dismissableRunInSubprocess(function()
+                local sync_success = false
+                widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
+                    sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
+                    return sync_success
+                end, true)
+                return sync_success
+            end, false)
+            if on_complete then
+                on_complete(completed and success)
+            end
+        end)
     else
         if on_complete then
             on_complete(false)
@@ -97,32 +133,11 @@ function M.pull_progress(widget, json_path, on_complete)
     local server = widget.settings.sync_server
     if server then
         widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
-            local local_data = utils.read_json(local_file) or {}
-            local income_data = utils.read_json(income_file) or {}
-
-            local_data = M._normalize_progress(local_data)
-            income_data = M._normalize_progress(income_data)
-
-            local changed = false
-            for device_id, data in pairs(income_data) do
-                if not local_data[device_id] or (data.timestamp or "") > (local_data[device_id].timestamp or "") then
-                    local_data[device_id] = data
-                    changed = true
-                end
-            end
-
-            if changed then
-                local f = io.open(local_file, "w")
-                if f then
-                    f:write(json.encode(local_data))
-                    f:close()
-                end
-            end
-
+            local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
             if on_complete then
-                on_complete(true, local_data)
+                on_complete(success, local_data)
             end
-            return true -- Push merged back to remote
+            return success -- Push merged back to remote
         end, false) -- is_silent = false
     else
         if on_complete then

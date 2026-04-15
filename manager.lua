@@ -135,7 +135,7 @@ function SyncManager:syncProgress()
 
         logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
         UIManager:scheduleIn(0.1, function()
-            remote.push_progress(json_path, function(success)
+            remote.push_progress_bg(json_path, function(success)
                 self.is_syncing = false
                 if success then
                     logger.dbg("AnnotationSync: progress sync successful")
