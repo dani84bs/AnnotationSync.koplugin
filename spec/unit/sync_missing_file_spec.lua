@@ -71,10 +71,7 @@ end
 
 local old_getProvider = DocumentRegistry.getProvider
 DocumentRegistry.getProvider = function(self, file)
-    if existing_files[file] then
-        return { provider = "crengine" }
-    end
-    return nil
+    return { provider = "crengine" }
 end
 
 local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
@@ -151,5 +148,11 @@ describe("Sync Missing File Handling", function()
         local _, changed_docs_after = manager:getPendingChangedDocuments()
         assert.is_nil(changed_docs_after[doc2], "doc2 should have been removed from the dirty list")
         assert.is_nil(changed_docs_after[doc1], "doc1 should have been removed after successful sync")
+    end)
+
+    it("returns nil when getDocumentByFile is called on a missing file", function()
+        existing_files["missing.epub"] = false
+        local doc = manager:getDocumentByFile("missing.epub")
+        assert.is_nil(doc)
     end)
 end)

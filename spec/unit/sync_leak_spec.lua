@@ -58,6 +58,13 @@ describe("Sync Document Leak Verification", function()
             return { provider = "crengine" }
         end
 
+        -- Mock util.fileExists
+        local util = require("util")
+        _G.old_util_fileExists = util.fileExists
+        util.fileExists = function(file)
+            return true
+        end
+
         -- Mock DocumentRegistry:openDocument
         local old_open = DocumentRegistry.openDocument
         DocumentRegistry.openDocument = function(self, file, provider)
@@ -101,6 +108,8 @@ describe("Sync Document Leak Verification", function()
     teardown(function()
         test_utils.teardown_test_env(test_data_dir, old_getDataDir)
         DocumentRegistry.openDocument = _G.old_DocumentRegistry_open
+        local util = require("util")
+        util.fileExists = _G.old_util_fileExists
         package.loaded["manager"] = nil
     end)
 
