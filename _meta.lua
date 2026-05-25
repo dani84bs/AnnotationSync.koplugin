@@ -4,5 +4,5 @@ return {
     fullname = _("Annotation Sync"),
     plugin_id = _("annotation_sync_plugin"),
     description = _([[Sync annotations and bookmarks between devices.]]),
-    version = "v1.0"
+    version = "v1.0.1"
 }
