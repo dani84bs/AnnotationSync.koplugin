@@ -135,7 +135,7 @@ function SyncManager:syncProgress()
 
         logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
         UIManager:scheduleIn(0.1, function()
-            remote.push_progress_bg(json_path, function(success)
+            remote.push_progress_bg(self.plugin, json_path, function(success)
                 self.is_syncing = false
                 if success then
                     logger.dbg("AnnotationSync: progress sync successful")
@@ -169,7 +169,7 @@ function SyncManager:pullProgress()
     local json_path = sdr_dir .. "/" .. filename
 
     utils.show_msg(_("Fetching remote progress..."))
-    remote.pull_progress(json_path, function(success, merged_data)
+    remote.pull_progress(self.plugin, json_path, function(success, merged_data)
         if success and merged_data then
             self:showJumpMenu(merged_data)
         else

@@ -28,6 +28,8 @@ describe("Background Sync Behavior", function()
         package.loaded["remote"] = nil
     end)
 
+    local mock_widget
+
     before_each(function()
         -- Mock Trapper
         Trapper.wrap = function(this, func)
@@ -45,6 +47,19 @@ describe("Background Sync Behavior", function()
 
         -- Mock UIManager:show to detect notifications
         UIManager.show = spy.new(function() end)
+
+        mock_widget = {
+            ui = {
+                cloudstorage = {
+                    sync = function(self, server, file_path, sync_cb, is_silent)
+                        return SyncService.sync(server, file_path, sync_cb)
+                    end
+                }
+            },
+            settings = {
+                sync_server = { url = "http://mock-server", type = "webdav" }
+            }
+        }
     end)
 
     it("push_progress_bg uses Trapper for background execution", function()
@@ -62,7 +77,7 @@ describe("Background Sync Behavior", function()
         end
 
         local on_complete_called = false
-        remote.push_progress_bg("dummy.json", function(success)
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
             on_complete_called = true
             assert.is_true(success)
         end)
@@ -79,7 +94,7 @@ describe("Background Sync Behavior", function()
         end
 
         local on_complete_called = false
-        remote.push_progress_bg("dummy.json", function(success)
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
             on_complete_called = true
             assert.is_false(success)
         end)
@@ -96,7 +111,7 @@ describe("Background Sync Behavior", function()
             func()
         end
 
-        remote.pull_progress("dummy.json", function(success)
+        remote.pull_progress(mock_widget, "dummy.json", function(success)
             assert.is_true(success)
         end)
 
@@ -115,7 +130,7 @@ describe("Background Sync Behavior", function()
         local old_sync_callback = annotations.sync_callback
         annotations.sync_callback = function() return true, {} end
 
-        remote.sync_annotations({}, {}, "dummy.json", function(success)
+        remote.sync_annotations(mock_widget, {}, "dummy.json", function(success)
             assert.is_true(success)
         end)
 
@@ -130,7 +145,7 @@ describe("Background Sync Behavior", function()
         end
 
         local on_complete_called = false
-        remote.push_progress_bg("dummy.json", function(success)
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
             on_complete_called = true
             assert.is_false(success)
         end)
