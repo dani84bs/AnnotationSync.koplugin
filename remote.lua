@@ -67,6 +67,35 @@ function M._sync_progress_callback(local_file, cached_file, income_file)
     return true, local_data
 end
 
+local function run_silent(widget, func)
+    local old_show = UIManager.show
+    local new_show
+    new_show = function(self, widget_item)
+        if widget_item.text == _("Successfully synchronized.") then
+            return
+        end
+        return old_show(self, widget_item)
+    end
+    UIManager.show = new_show
+
+    local restored = false
+    local function restore()
+        if not restored then
+            restored = true
+            if UIManager.show == new_show then
+                UIManager.show = old_show
+            end
+        end
+    end
+
+    -- Timeout safety fallback (15 seconds)
+    UIManager:scheduleIn(15, restore)
+
+    func(function()
+        restore()
+    end)
+end
+
 function M.push_progress(widget, json_path, on_complete)
     if not widget.ui.cloudstorage then
         if on_complete then
@@ -77,13 +106,19 @@ function M.push_progress(widget, json_path, on_complete)
 
     local server = widget.settings.sync_server
     if server then
-        widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
-            local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
-            if on_complete then
-                on_complete(success)
+        run_silent(widget, function(restore)
+            local success = widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
+                local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
+                if on_complete then
+                    on_complete(success)
+                end
+                restore()
+                return success
+            end, true) -- is_silent = true
+            if success == false then
+                restore()
             end
-            return success
-        end, true) -- is_silent = true
+        end)
     else
         if on_complete then
             on_complete(false)
@@ -105,10 +140,16 @@ function M.push_progress_bg(widget, json_path, on_complete)
         Trapper:wrap(function()
             local completed, success = Trapper:dismissableRunInSubprocess(function()
                 local sync_success = false
-                widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
-                    sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
-                    return sync_success
-                end, true)
+                run_silent(widget, function(restore)
+                    local res = widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
+                        sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
+                        restore()
+                        return sync_success
+                    end, true)
+                    if res == false then
+                        restore()
+                    end
+                end)
                 return sync_success
             end, false)
             if on_complete then

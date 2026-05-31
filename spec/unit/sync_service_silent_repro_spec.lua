@@ -1,12 +1,17 @@
+local _ = function(s) return s end
+
 describe("SyncService Silent Mode Repro", function()
-    local UIManager, SyncService, NetworkMgr
+    local UIManager, NetworkMgr, remote
     local test_data_dir = os.getenv("PWD") .. "/test_sync_service_repro_tmp"
 
     setup(function()
         require("commonrequire")
+        local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
+        package.path = plugin_path .. ";" .. package.path
+
         UIManager = require("ui/uimanager")
-        SyncService = require("apps/cloudstorage/syncservice")
         NetworkMgr = require("ui/network/manager")
+        remote = require("remote")
         
         -- Mock Network connected
         NetworkMgr.isConnected = function() return true end
@@ -21,13 +26,6 @@ describe("SyncService Silent Mode Repro", function()
             show_called = true
         end
 
-        -- Mock server and API
-        local server = { type = "webdav", url = "/test", address = "http://localhost", username = "u", password = "p" }
-        local webdavapi = require("apps/cloudstorage/webdavapi")
-        webdavapi.downloadFile = function() return 200, "etag123" end
-        webdavapi.uploadFile = function() return 201 end
-        webdavapi.getJoinedPath = function(_, a, b) return a .. b end
-
         -- Mock sync callback
         local sync_cb = function() return true end
 
@@ -38,7 +36,27 @@ describe("SyncService Silent Mode Repro", function()
         f:write("{}")
         f:close()
 
-        SyncService.sync(server, test_file, sync_cb, true)
+        -- Mock cloudstorage plugin
+        local mock_widget = {
+            ui = {
+                cloudstorage = {
+                    sync = function(self, server, file_path, sync_cb, is_silent)
+                        -- Simulate successful sync notification
+                        UIManager:show(require("ui/widget/notification"):new{
+                            text = _("Successfully synchronized."),
+                            timeout = 2,
+                        })
+                        local success = sync_cb(file_path, file_path, file_path)
+                        return success
+                    end
+                }
+            },
+            settings = {
+                sync_server = { url = "/test" }
+            }
+        }
+
+        remote.push_progress(mock_widget, test_file, sync_cb)
 
         UIManager.show = old_show
         os.execute("rm -rf " .. test_data_dir)
