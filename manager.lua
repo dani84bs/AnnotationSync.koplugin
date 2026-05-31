@@ -181,6 +181,7 @@ end
 function SyncManager:showJumpMenu(progress_map)
     local Menu = require("ui/widget/menu")
     local menu_items = {}
+    local jump_menu
 
     local device_id = Device.model or "unknown"
 
@@ -209,13 +210,18 @@ function SyncManager:showJumpMenu(progress_map)
             sub_text = dev.data.timestamp,
             callback = function()
                 if dev.data.pos then
-                    self.plugin.ui:handleEvent(Event:new("GotoPos", dev.data.pos))
-                    UIManager:broadcastEvent(Event:new("GotoPos", dev.data.pos))
+                    if self.plugin.ui.link then
+                        self.plugin.ui.link:onGotoLink({ xpointer = dev.data.pos })
+                    else
+                        self.plugin.ui:handleEvent(Event:new("GotoPos", dev.data.pos))
+                        UIManager:broadcastEvent(Event:new("GotoPos", dev.data.pos))
+                    end
                 else
                     self.plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
                     UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
                 end
                 utils.show_msg(T(_("Jumped to page %1 from %2"), dev.data.page, dev.id))
+                UIManager:close(jump_menu)
             end
         })
     end
@@ -225,7 +231,7 @@ function SyncManager:showJumpMenu(progress_map)
         return
     end
 
-    local jump_menu = Menu:new{
+    jump_menu = Menu:new{
         title = _("Jump to device progress"),
         item_table = menu_items,
     }

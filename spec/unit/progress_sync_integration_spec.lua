@@ -324,6 +324,16 @@ describe("Reading Progress Sync Integration", function()
         end
 
         local goto_pos_fired = false
+        local old_onGotoLink
+        if readerui.link then
+            old_onGotoLink = readerui.link.onGotoLink
+            readerui.link.onGotoLink = function(this, target)
+                if target.xpointer == "remote-pos-456" then
+                    goto_pos_fired = true
+                end
+            end
+        end
+
         local old_broadcast = UIManager.broadcastEvent
         UIManager.broadcastEvent = function(this, event)
             if event.handler == "onGotoPos" and event.args[1] == "remote-pos-456" then
@@ -340,6 +350,9 @@ describe("Reading Progress Sync Integration", function()
         UIManager.show = old_UIManager_show
         UIManager.broadcastEvent = old_broadcast
         remote.pull_progress = old_pull
+        if readerui.link and old_onGotoLink then
+            readerui.link.onGotoLink = old_onGotoLink
+        end
     end)
 
     it("falls back to 'GotoPage' when 'pos' is missing in remote data", function()
