@@ -10,7 +10,7 @@ local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
-local SyncService = require("apps/cloudstorage/syncservice")
+local json = require("json")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
@@ -61,6 +61,18 @@ function AnnotationSyncPlugin:init()
 
     self.settings = G_reader_settings:readSetting(self.plugin_id, util.tableDeepCopy(self.default_settings))
 
+    -- Fallback/migration for legacy cloud_server_object
+    if not self.settings.sync_server then
+        local server_json = G_reader_settings:readSetting("cloud_server_object")
+        if server_json and server_json ~= "" then
+            local ok, server = pcall(json.decode, server_json)
+            if ok and server then
+                self.settings.sync_server = server
+                self:saveSettings()
+            end
+        end
+    end
+
     -- Sanitize corrupted settings
     if type(self.settings.progress_sync_interval) ~= "number" then
         self.settings.progress_sync_interval = self.default_settings.progress_sync_interval
@@ -91,12 +103,13 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 sub_item_table = {
                     {
                         text = _("Cloud settings"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil
+                        end,
                         callback = function()
-                            local sync_service = SyncService:new {}
-                            sync_service.onConfirm = function(server)
+                            self.ui.cloudstorage:onShowCloudStorageList(function(server)
                                 self:onSyncServiceConfirm(server)
-                            end
-                            UIManager:show(sync_service)
+                            end)
                         end
                     },
                     {
@@ -317,7 +330,21 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
 end
 
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
-    remote.save_server_settings(server)
+    self.settings.sync_server = server
+    self:saveSettings()
+
+    -- Keep G_reader_settings updated for legacy compatibility and menu enablement
+    G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
+    G_reader_settings:saveSetting("cloud_download_dir", server.url)
+    if server.type then
+        G_reader_settings:saveSetting("cloud_provider_type", server.type)
+    end
+
+    UIManager:show(InfoMessage:new{
+        text = T(_("Cloud destination set to:\n%1\nProvider: %2"),
+            server.url, server.type or "unknown"),
+        timeout = 4
+    })
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
         self.ui.menu:showMainMenu()
     end

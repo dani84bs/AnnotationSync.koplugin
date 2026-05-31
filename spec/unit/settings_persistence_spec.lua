@@ -99,4 +99,45 @@ describe("AnnotationSync Settings Persistence", function()
         assert.is_equal(1, sync_instance.settings.progress_sync_interval)
         assert.is_false(sync_instance.settings.progress_sync)
     end)
+
+    it("should migrate legacy cloud_server_object on init", function()
+        -- 1. Setup legacy setting
+        local legacy_server = { url = "http://legacy-server", type = "webdav" }
+        G_reader_settings:saveSetting("cloud_server_object", json.encode(legacy_server))
+        
+        -- 2. Clear plugin settings sync_server
+        local plugin_settings = G_reader_settings:readSetting(sync_instance.plugin_id) or {}
+        plugin_settings.sync_server = nil
+        G_reader_settings:saveSetting(sync_instance.plugin_id, plugin_settings)
+
+        -- 3. Re-initialize plugin
+        sync_instance:init()
+
+        -- 4. Verify it was migrated
+        assert.is_not_nil(sync_instance.settings.sync_server)
+        assert.is_equal("http://legacy-server", sync_instance.settings.sync_server.url)
+        assert.is_equal("webdav", sync_instance.settings.sync_server.type)
+
+        -- Clean up
+        G_reader_settings:delSetting("cloud_server_object")
+    end)
+
+    it("should save sync_server and update G_reader_settings on confirmation", function()
+        local test_server = { url = "http://test-server-confirm", type = "dropbox" }
+        
+        -- 1. Call onSyncServiceConfirm
+        sync_instance:onSyncServiceConfirm(test_server)
+
+        -- 2. Verify sync_server is updated in settings
+        assert.is_not_nil(sync_instance.settings.sync_server)
+        assert.is_equal("http://test-server-confirm", sync_instance.settings.sync_server.url)
+
+        -- 3. Verify G_reader_settings keys are updated for compatibility
+        local server_json = G_reader_settings:readSetting("cloud_server_object")
+        assert.is_not_nil(server_json)
+        local saved_server = json.decode(server_json)
+        assert.is_equal("http://test-server-confirm", saved_server.url)
+        assert.is_equal("http://test-server-confirm", G_reader_settings:readSetting("cloud_download_dir"))
+        assert.is_equal("dropbox", G_reader_settings:readSetting("cloud_provider_type"))
+    end)
 end)
