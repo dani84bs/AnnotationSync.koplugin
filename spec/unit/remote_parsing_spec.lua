@@ -83,4 +83,21 @@ describe("Remote Response Parsing (Issue #39)", function()
         local ok, merged = run_sync_callback(dropbox_error)
         assert.is_true(ok, "Should accept Dropbox path not found")
     end)
+
+    it("normalizes old progress format and preserves 'pos'", function()
+        local remote = require("remote")
+        local old_data = {
+            device = "OldDevice",
+            page = 10,
+            percentage = 0.5,
+            pos = "old-pos-123",
+            timestamp = "2026-04-14 12:00:00"
+        }
+        local normalized = remote._normalize_progress(old_data)
+        assert.is_table(normalized["OldDevice"])
+        assert.is_equal(10, normalized["OldDevice"].page)
+        assert.is_equal(0.5, normalized["OldDevice"].percentage)
+        assert.is_equal("old-pos-123", normalized["OldDevice"].pos)
+        assert.is_equal("2026-04-14 12:00:00", normalized["OldDevice"].timestamp)
+    end)
 end)

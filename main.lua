@@ -5,11 +5,12 @@ local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
 local InfoMessage = require("ui/widget/infomessage")
 local ConfirmBox = require("ui/widget/confirmbox")
+local InputDialog = require("ui/widget/inputdialog")
 local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
-local SyncService = require("apps/cloudstorage/syncservice")
+local json = require("json")
 local util = require("util")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
@@ -20,6 +21,8 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 local SyncManager = require("manager")
+
+local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
@@ -36,14 +39,48 @@ AnnotationSyncPlugin.default_settings = {
     last_sync = "Never",
     use_filename= false,
     network_auto_sync = false,
+    progress_sync = false,
+    progress_sync_interval = 1,
+    progress_sync_last_word = false,
 }
 
 function AnnotationSyncPlugin:init()
     self.ui.menu:registerToMainMenu(self)
+
+    -- Ensure the plugin is in the ReaderUI event chain
+    local found = false
+    for _, child in ipairs(self.ui) do
+        if child == self then
+            found = true
+            break
+        end
+    end
+    if not found then
+        table.insert(self.ui, self)
+    end
+
     utils.insert_after_statistics(self.plugin_id)
     self:onDispatcherRegisterActions()
 
-    self.settings = G_reader_settings:readSetting(self.plugin_id, self.default_settings)
+    self.settings = G_reader_settings:readSetting(self.plugin_id, util.tableDeepCopy(self.default_settings))
+
+    -- Fallback/migration for legacy cloud_server_object
+    if not self.settings.sync_server then
+        local server_json = G_reader_settings:readSetting("cloud_server_object")
+        if server_json and server_json ~= "" then
+            local ok, server = pcall(json.decode, server_json)
+            if ok and server then
+                self.settings.sync_server = server
+                self:saveSettings()
+            end
+        end
+    end
+
+    -- Sanitize corrupted settings
+    if type(self.settings.progress_sync_interval) ~= "number" then
+        self.settings.progress_sync_interval = self.default_settings.progress_sync_interval
+    end
+
     self.manager = SyncManager:new(self)
 
     -- Migrate old annotation_sync_use_filename setting
@@ -53,6 +90,10 @@ function AnnotationSyncPlugin:init()
     end
 
     self:registerEvents()
+end
+
+function AnnotationSyncPlugin:saveSettings()
+    G_reader_settings:saveSetting(self.plugin_id, self.settings)
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
@@ -65,12 +106,21 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 sub_item_table = {
                     {
                         text = _("Cloud settings"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil or has_syncservice
+                        end,
                         callback = function()
-                            local sync_service = SyncService:new {}
-                            sync_service.onConfirm = function(server)
-                                self:onSyncServiceConfirm(server)
+                            if self.ui.cloudstorage then
+                                self.ui.cloudstorage:onShowCloudStorageList(function(server)
+                                    self:onSyncServiceConfirm(server)
+                                end)
+                            elseif has_syncservice then
+                                local sync_service = SyncService:new {}
+                                sync_service.onConfirm = function(server)
+                                    self:onSyncServiceConfirm(server)
+                                end
+                                UIManager:show(sync_service)
                             end
-                            UIManager:show(sync_service)
                         end
                     },
                     {
@@ -79,8 +129,8 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             return self.settings.use_filename
                         end,
                         callback = function()
-                            local current = self.settings.use_filename
-                            self.settings.use_filename = not current
+                            self.settings.use_filename = not self.settings.use_filename
+                            self:saveSettings()
                             UIManager:close()
                         end
                     },
@@ -90,13 +140,69 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             return self.settings.network_auto_sync
                         end,
                         callback = function()
-                            local current = self.settings.network_auto_sync
-                            self.settings.network_auto_sync = not current
+                            self.settings.network_auto_sync = not self.settings.network_auto_sync
+                            self:saveSettings()
                             if self.settings.network_auto_sync then
                                 self:registerEvents()
                             end
                             UIManager:close()
                         end
+                    },
+                    {
+                        text = _("Enable Reading Progress Sync"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil
+                        end,
+                        checked_func = function()
+                            return self.settings.progress_sync
+                        end,
+                        callback = function()
+                            self.settings.progress_sync = not self.settings.progress_sync
+                            self:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text = _("Sync using last word of page"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
+                        end,
+                        checked_func = function()
+                            return self.settings.progress_sync_last_word
+                        end,
+                        callback = function()
+                            self.settings.progress_sync_last_word = not self.settings.progress_sync_last_word
+                            self:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Sync every %1 pages"), self.settings.progress_sync_interval)
+                        end,
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
+                        end,
+                        callback = function()
+                            local input
+                            input = InputDialog:new{
+                                title = _("Sync every # pages"),
+                                input = tostring(self.settings.progress_sync_interval),
+                                input_type = "number",
+                                save_callback = function(val)
+                                    local n = tonumber(val)
+                                    if n and n > 0 then
+                                        self.settings.progress_sync_interval = math.floor(n)
+                                        self:saveSettings()
+                                        if self.ui.menu and self.ui.menu.showMainMenu then
+                                            self.ui.menu:showMainMenu()
+                                        end
+                                        return true
+                                    end
+                                end
+                            }
+                            UIManager:show(input)
+                        end,
                     },
                 },
                 separator = true,
@@ -109,6 +215,17 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end,
                 callback = function()
                     self:manualSync()
+                end
+            },
+            {
+                text = _("Jump to device progress"),
+                enabled_func = function()
+                    return self.ui.cloudstorage ~= nil
+                        and ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "")
+                        and ((self.ui and self.ui.document) ~= nil)
+                end,
+                callback = function()
+                    self.manager:pullProgress()
                 end
             },
             {
@@ -147,6 +264,17 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
         }
     }
+
+    if self.ui.cloudstorage == nil then
+        table.insert(menu_items.annotation_sync_plugin.sub_item_table, {
+            text = _("Why are some options greyed out?"),
+            callback = function()
+                UIManager:show(InfoMessage:new{
+                    text = _("Reading progress sync features are disabled because your KOReader version does not support the cloudstorage plugin.\n\nThese features require a newer KOReader release (not yet available in stable releases)."),
+                })
+            end,
+        })
+    end
 end
 
 function AnnotationSyncPlugin:registerEvents()
@@ -207,6 +335,24 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     return true
 end
 
+function AnnotationSyncPlugin:onPageUpdate(page_pos)
+    if self.manager then
+        self.manager:onPageUpdate(page_pos)
+    end
+end
+
+function AnnotationSyncPlugin:onPosUpdate(page_pos)
+    if self.manager then
+        self.manager:onPageUpdate(page_pos)
+    end
+end
+
+function AnnotationSyncPlugin:onPagePositionUpdated(page_pos)
+    if self.manager then
+        self.manager:onPageUpdate(page_pos)
+    end
+end
+
 function AnnotationSyncPlugin:onDispatcherRegisterActions()
     Dispatcher:registerAction("annotation_sync_manual_sync", {
         category = "none",
@@ -227,7 +373,21 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
 end
 
 function AnnotationSyncPlugin:onSyncServiceConfirm(server)
-    remote.save_server_settings(server)
+    self.settings.sync_server = server
+    self:saveSettings()
+
+    -- Keep G_reader_settings updated for legacy compatibility and menu enablement
+    G_reader_settings:saveSetting("cloud_server_object", json.encode(server))
+    G_reader_settings:saveSetting("cloud_download_dir", server.url)
+    if server.type then
+        G_reader_settings:saveSetting("cloud_provider_type", server.type)
+    end
+
+    UIManager:show(InfoMessage:new{
+        text = T(_("Cloud destination set to:\n%1\nProvider: %2"),
+            server.url, server.type or "unknown"),
+        timeout = 4
+    })
     if self and self.ui and self.ui.menu and self.ui.menu.showMainMenu then
         self.ui.menu:showMainMenu()
     end
@@ -246,7 +406,7 @@ end
 
 function AnnotationSyncPlugin:showDeletedAnnotations()
     local document = self.ui and self.ui.document
-    if not document or not ann then return end
+    if not document then return end
 
     local deleted = self.manager:getDeletedAnnotations(document)
     if #deleted == 0 then
@@ -311,7 +471,7 @@ end
 
 function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
     local document = self.ui and self.ui.document
-    if not document or not ann then return end
+    if not document then return end
 
     -- 1. Mark as not deleted and update timestamp
     ann.deleted = false

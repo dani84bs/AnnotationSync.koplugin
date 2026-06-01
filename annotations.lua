@@ -2,6 +2,7 @@ local docsettings = require("frontend/docsettings")
 local utils = require("utils")
 local json = require("json")
 local logger = require("logger")
+local util = require("util")
 
 local M = {}
 
@@ -141,11 +142,7 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
     logger.dbg("AnnotationSync:sync_callback: handling merged list")
     local merged_list = M.map_to_list(merged)
 
-    local f = io.open(local_file, "w")
-    if f then
-        f:write(json.encode(merged))
-        f:close()
-    end
+    util.writeToFile(json.encode(merged), local_file, true, false, true)
     return true, merged_list
 end
 
@@ -156,10 +153,7 @@ function M.write_annotations_json(document, stored_annotations, sdr_dir, annotat
     end
     local annotation_map = M.list_to_map(stored_annotations)
     local json_path = sdr_dir .. "/" .. annotation_filename
-    local f = io.open(json_path, "w")
-    if f then
-        f:write(json.encode(annotation_map))
-        f:close()
+    if util.writeToFile(json.encode(annotation_map), json_path, true, false, true) then
         return json_path
     end
     return false

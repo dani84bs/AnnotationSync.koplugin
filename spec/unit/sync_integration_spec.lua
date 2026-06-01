@@ -81,6 +81,21 @@ describe("AnnotationSync Core Integration", function()
             assert.is_false(sync_instance.manager:hasPendingChangedDocuments())
         end)
 
+        it("manualSync remains synchronous and does NOT use Trapper", function()
+            local Trapper = require("ui/trapper")
+            local wrap_called = false
+            local old_wrap = Trapper.wrap
+            Trapper.wrap = function(this, func)
+                wrap_called = true
+                func()
+            end
+
+            sync_instance:manualSync()
+
+            assert.is_false(wrap_called)
+            Trapper.wrap = old_wrap
+        end)
+
         it("handles first sync of an empty book gracefully", function()
             -- Ensure no previous files exist
             local file = readerui.document.file
