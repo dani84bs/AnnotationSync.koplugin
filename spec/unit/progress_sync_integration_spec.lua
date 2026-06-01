@@ -448,7 +448,7 @@ describe("Reading Progress Sync Integration", function()
         remote.push_progress_bg = old_push
     end)
 
-    it("resolves pos to the last word of the page for reflowable documents in page mode", function()
+    it("resolves pos to the last-but-3 word of the page for reflowable documents in page mode when setting is enabled", function()
         local remote = require("remote")
         local old_push = remote.push_progress_bg
         remote.push_progress_bg = function(widget, path, callback) callback(true) end
@@ -456,6 +456,72 @@ describe("Reading Progress Sync Integration", function()
         -- Save and set up mock view
         local old_view = readerui.view
         readerui.view = { view_mode = "page" }
+
+        -- Mock settings.progress_sync_last_word to true
+        sync_instance.settings.progress_sync_last_word = true
+
+        -- Mock getPageXPointer, getPrevVisibleWordStart, and isXPointerInDocument on document
+        local old_getPageXPointer = readerui.document.getPageXPointer
+        local old_getPrevVisibleWordStart = readerui.document.getPrevVisibleWordStart
+        local old_isXPointerInDocument = readerui.document.isXPointerInDocument
+
+        readerui.document.getPageXPointer = function(this, page)
+            if page == 7 then
+                return "next-page-pos-xp"
+            end
+        end
+        readerui.document.getPrevVisibleWordStart = function(this, xp)
+            if xp == "next-page-pos-xp" then
+                return "last-word-pos-xp"
+            elseif xp == "last-word-pos-xp" then
+                return "second-to-last-word-pos-xp"
+            elseif xp == "second-to-last-word-pos-xp" then
+                return "third-to-last-word-pos-xp"
+            end
+        end
+        readerui.document.isXPointerInDocument = function(this, xp)
+            if xp == "mock-pos-123" then
+                return true
+            end
+        end
+
+        -- Trigger sync at page 6 (so next page is 7)
+        readerui.document.page = 5
+        sync_instance:onPageUpdate()
+        readerui.document.page = 6
+        sync_instance:onPageUpdate()
+        fastforward_ui_events()
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+
+        local f = io.open(json_path, "r")
+        local content = f:read("*all")
+        f:close()
+
+        local data = json.decode(content)
+        assert.is_equal("third-to-last-word-pos-xp", data["TestDevice"].pos)
+
+        -- Clean up
+        sync_instance.settings.progress_sync_last_word = false
+        readerui.view = old_view
+        readerui.document.getPageXPointer = old_getPageXPointer
+        readerui.document.getPrevVisibleWordStart = old_getPrevVisibleWordStart
+        readerui.document.isXPointerInDocument = old_isXPointerInDocument
+        remote.push_progress_bg = old_push
+    end)
+
+    it("keeps default first-word behavior when settings.progress_sync_last_word is false (default)", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(widget, path, callback) callback(true) end
+
+        -- Save and set up mock view
+        local old_view = readerui.view
+        readerui.view = { view_mode = "page" }
+
+        -- settings.progress_sync_last_word is false by default
 
         -- Mock getPageXPointer, getPrevVisibleWordStart, and isXPointerInDocument on document
         local old_getPageXPointer = readerui.document.getPageXPointer
@@ -494,7 +560,8 @@ describe("Reading Progress Sync Integration", function()
         f:close()
 
         local data = json.decode(content)
-        assert.is_equal("last-word-pos-xp", data["TestDevice"].pos)
+        -- Should keep the mock-pos-123 (first word of page)
+        assert.is_equal("mock-pos-123", data["TestDevice"].pos)
 
         -- Clean up
         readerui.view = old_view

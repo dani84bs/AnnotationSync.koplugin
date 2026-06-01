@@ -41,6 +41,7 @@ AnnotationSyncPlugin.default_settings = {
     network_auto_sync = false,
     progress_sync = false,
     progress_sync_interval = 1,
+    progress_sync_last_word = false,
 }
 
 function AnnotationSyncPlugin:init()
@@ -157,6 +158,20 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                         end,
                         callback = function()
                             self.settings.progress_sync = not self.settings.progress_sync
+                            self:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text = _("Sync using last word of page"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
+                        end,
+                        checked_func = function()
+                            return self.settings.progress_sync_last_word
+                        end,
+                        callback = function()
+                            self.settings.progress_sync_last_word = not self.settings.progress_sync_last_word
                             self:saveSettings()
                             UIManager:close()
                         end,

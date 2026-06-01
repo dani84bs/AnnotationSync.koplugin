@@ -106,7 +106,7 @@ function SyncManager:syncProgress()
     end
 
     local pos = paging_module and paging_module.getLastProgress and paging_module:getLastProgress()
-    if type(pos) == "string" then
+    if type(pos) == "string" and self.plugin.settings.progress_sync_last_word then
         local view = self.plugin.ui.view
         if view and view.view_mode == "page" then
             local doc = self.plugin.ui.document
@@ -114,9 +114,17 @@ function SyncManager:syncProgress()
                 if doc.getPageXPointer and doc.getPrevVisibleWordStart then
                     local next_page_xp = doc:getPageXPointer(page + 1)
                     if next_page_xp then
-                        local last_word_xp = doc:getPrevVisibleWordStart(next_page_xp)
-                        if last_word_xp then
-                            pos = last_word_xp
+                        local xp = next_page_xp
+                        for i = 1, 3 do
+                            local prev_xp = doc:getPrevVisibleWordStart(xp)
+                            if prev_xp then
+                                xp = prev_xp
+                            else
+                                break
+                            end
+                        end
+                        if xp ~= next_page_xp then
+                            pos = xp
                         end
                     end
                 end
