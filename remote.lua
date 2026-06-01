@@ -127,7 +127,7 @@ function M.push_progress(widget, json_path, on_complete)
                 cb_called = true
                 local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
                 on_complete_once(success)
-                restore()
+                UIManager:nextTick(restore)
                 return success
             end, true) -- is_silent = true
 
@@ -166,7 +166,7 @@ function M.push_progress_bg(widget, json_path, on_complete)
                 run_silent(widget, function(restore)
                     local res = widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
                         sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
-                        restore()
+                        UIManager:nextTick(restore)
                         return sync_success
                     end, true)
                     if res == false then
