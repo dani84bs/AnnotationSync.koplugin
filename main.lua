@@ -264,6 +264,17 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
         }
     }
+
+    if self.ui.cloudstorage == nil then
+        table.insert(menu_items.annotation_sync_plugin.sub_item_table, {
+            text = _("Why are some options greyed out?"),
+            callback = function()
+                UIManager:show(InfoMessage:new{
+                    text = _("Reading progress sync features are disabled because your KOReader version does not support the cloudstorage plugin.\n\nThese features require a newer KOReader release (not yet available in stable releases)."),
+                })
+            end,
+        })
+    end
 end
 
 function AnnotationSyncPlugin:registerEvents()

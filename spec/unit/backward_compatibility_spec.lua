@@ -144,4 +144,39 @@ describe("AnnotationSync Backward Compatibility", function()
         -- Cleanup
         UIManager.show = old_show
     end)
+
+    it("should show 'Why are some options greyed out?' menu item at the end of the menu when self.ui.cloudstorage is nil", function()
+        -- 1. Remove cloudstorage from readerui
+        readerui.cloudstorage = nil
+        sync_instance.ui.cloudstorage = nil
+
+        -- 2. Generate menu items
+        local menu_items = {}
+        sync_instance:addToMainMenu(menu_items)
+        local plugin_menu = menu_items.annotation_sync_plugin.sub_item_table
+        
+        -- 3. Verify the last item is our explanation button
+        local last_item = plugin_menu[#plugin_menu]
+        assert.is_not_nil(last_item)
+        assert.is_nil(last_item.enabled) -- defaults to enabled
+        assert.is_equal(last_item.text, "Why are some options greyed out?")
+        assert.is_not_nil(last_item.callback)
+    end)
+
+    it("should not show 'Why are some options greyed out?' menu item when self.ui.cloudstorage is present", function()
+        -- 1. Set mock cloudstorage
+        sync_instance.ui.cloudstorage = {}
+
+        -- 2. Generate menu items
+        local menu_items = {}
+        sync_instance:addToMainMenu(menu_items)
+        local plugin_menu = menu_items.annotation_sync_plugin.sub_item_table
+        
+        -- 3. Verify no explanation button is present anywhere in the menu
+        for _, item in ipairs(plugin_menu) do
+            if item.text then
+                assert.is_nil(item.text:match("Why are some options greyed out%?"))
+            end
+        end
+    end)
 end)
