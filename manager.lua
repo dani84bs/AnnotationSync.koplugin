@@ -447,6 +447,9 @@ end
 
 -- Helper to get a document object by file path
 function SyncManager:getDocumentByFile(file)
+    if not file or not util.fileExists(file) then
+        return nil
+    end
     -- If the current document is available, return it if it matches.
     local ui_document = self.plugin.ui and self.plugin.ui.document
     if ui_document and ui_document.file == file then
