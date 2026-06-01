@@ -22,6 +22,8 @@ local remote = require("remote")
 local utils = require("utils")
 local SyncManager = require("manager")
 
+local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
+
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
 
@@ -104,12 +106,20 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     {
                         text = _("Cloud settings"),
                         enabled_func = function()
-                            return self.ui.cloudstorage ~= nil
+                            return self.ui.cloudstorage ~= nil or has_syncservice
                         end,
                         callback = function()
-                            self.ui.cloudstorage:onShowCloudStorageList(function(server)
-                                self:onSyncServiceConfirm(server)
-                            end)
+                            if self.ui.cloudstorage then
+                                self.ui.cloudstorage:onShowCloudStorageList(function(server)
+                                    self:onSyncServiceConfirm(server)
+                                end)
+                            elseif has_syncservice then
+                                local sync_service = SyncService:new {}
+                                sync_service.onConfirm = function(server)
+                                    self:onSyncServiceConfirm(server)
+                                end
+                                UIManager:show(sync_service)
+                            end
                         end
                     },
                     {
@@ -139,6 +149,9 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     },
                     {
                         text = _("Enable Reading Progress Sync"),
+                        enabled_func = function()
+                            return self.ui.cloudstorage ~= nil
+                        end,
                         checked_func = function()
                             return self.settings.progress_sync
                         end,
@@ -153,7 +166,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             return T(_("Sync every %1 pages"), self.settings.progress_sync_interval)
                         end,
                         enabled_func = function()
-                            return self.settings.progress_sync
+                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
                         end,
                         callback = function()
                             local input
@@ -191,7 +204,11 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Jump to device progress"),
-                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
+                enabled_func = function()
+                    return self.ui.cloudstorage ~= nil
+                        and ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "")
+                        and ((self.ui and self.ui.document) ~= nil)
+                end,
                 callback = function()
                     self.manager:pullProgress()
                 end

@@ -8,10 +8,22 @@ local util = require("util")
 local annotations = require("annotations")
 local utils = require("utils")
 
+local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
+
 local M = {}
 
+local function get_sync_provider(widget)
+    if widget.ui.cloudstorage then
+        return widget.ui.cloudstorage
+    elseif has_syncservice then
+        return SyncService
+    end
+    return nil
+end
+
 function M.sync_annotations(widget, document, json_path, on_complete, force)
-    if not widget.ui.cloudstorage then
+    local provider = get_sync_provider(widget)
+    if not provider then
         UIManager:show(InfoMessage:new {
             text = _("Cloud Storage plugin is not enabled or available."),
             timeout = 4
@@ -24,13 +36,19 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
 
     local server = widget.settings.sync_server
     if server then
-        widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
+        local sync_cb = function(local_file, cached_file, income_file)
             local success, merged_list = annotations.sync_callback(document, local_file, cached_file, income_file, force)
             if on_complete then
                 on_complete(success, merged_list)
             end
             return success
-        end, not force)
+        end
+
+        if widget.ui.cloudstorage then
+            widget.ui.cloudstorage:sync(server, json_path, sync_cb, not force)
+        else
+            SyncService.sync(server, json_path, sync_cb, not force)
+        end
     else
         UIManager:show(InfoMessage:new {
             text = T(_("No cloud destination set in settings.")),

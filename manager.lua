@@ -31,7 +31,7 @@ function SyncManager:new(plugin)
 end
 
 function SyncManager:onPageUpdate(page_pos)
-    if not self.plugin.settings.progress_sync then return end
+    if not self.plugin.ui.cloudstorage or not self.plugin.settings.progress_sync then return end
     logger.dbg("AnnotationSync: onPageUpdate event received")
 
     local current_page = self.plugin.ui:getCurrentPage()
@@ -147,6 +147,11 @@ function SyncManager:syncProgress()
 end
 
 function SyncManager:pullProgress()
+    if not self.plugin.ui.cloudstorage then
+        utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
+        return
+    end
+
     if not NetworkMgr:isConnected() then
         utils.show_msg(_("Network is disconnected, cannot pull progress"))
         return
