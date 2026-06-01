@@ -412,6 +412,10 @@ describe("Reading Progress Sync Integration", function()
         local old_push = remote.push_progress_bg
         remote.push_progress_bg = function(widget, path, callback) callback(true) end
 
+        -- Save original values
+        local old_paging = readerui.paging
+        local old_rolling = readerui.rolling
+
         -- Remove paging and add rolling
         readerui.paging = nil
         readerui.rolling = {
@@ -438,6 +442,65 @@ describe("Reading Progress Sync Integration", function()
         assert.is_equal(0.88, data["TestDevice"].percentage)
         assert.is_equal("rolling-pos-789", data["TestDevice"].pos)
         
+        -- Clean up
+        readerui.paging = old_paging
+        readerui.rolling = old_rolling
+        remote.push_progress_bg = old_push
+    end)
+
+    it("resolves pos to the last word of the page for reflowable documents in page mode", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(widget, path, callback) callback(true) end
+
+        -- Save and set up mock view
+        local old_view = readerui.view
+        readerui.view = { view_mode = "page" }
+
+        -- Mock getPageXPointer, getPrevVisibleWordStart, and isXPointerInDocument on document
+        local old_getPageXPointer = readerui.document.getPageXPointer
+        local old_getPrevVisibleWordStart = readerui.document.getPrevVisibleWordStart
+        local old_isXPointerInDocument = readerui.document.isXPointerInDocument
+
+        readerui.document.getPageXPointer = function(this, page)
+            if page == 7 then
+                return "next-page-pos-xp"
+            end
+        end
+        readerui.document.getPrevVisibleWordStart = function(this, xp)
+            if xp == "next-page-pos-xp" then
+                return "last-word-pos-xp"
+            end
+        end
+        readerui.document.isXPointerInDocument = function(this, xp)
+            if xp == "mock-pos-123" then
+                return true
+            end
+        end
+
+        -- Trigger sync at page 6 (so next page is 7)
+        readerui.document.page = 5
+        sync_instance:onPageUpdate()
+        readerui.document.page = 6
+        sync_instance:onPageUpdate()
+        fastforward_ui_events()
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+
+        local f = io.open(json_path, "r")
+        local content = f:read("*all")
+        f:close()
+
+        local data = json.decode(content)
+        assert.is_equal("last-word-pos-xp", data["TestDevice"].pos)
+
+        -- Clean up
+        readerui.view = old_view
+        readerui.document.getPageXPointer = old_getPageXPointer
+        readerui.document.getPrevVisibleWordStart = old_getPrevVisibleWordStart
+        readerui.document.isXPointerInDocument = old_isXPointerInDocument
         remote.push_progress_bg = old_push
     end)
 end)

@@ -105,10 +105,29 @@ function SyncManager:syncProgress()
         percentage = page / total
     end
 
+    local pos = paging_module and paging_module.getLastProgress and paging_module:getLastProgress()
+    if type(pos) == "string" then
+        local view = self.plugin.ui.view
+        if view and view.view_mode == "page" then
+            local doc = self.plugin.ui.document
+            if doc and doc.isXPointerInDocument and doc:isXPointerInDocument(pos) then
+                if doc.getPageXPointer and doc.getPrevVisibleWordStart then
+                    local next_page_xp = doc:getPageXPointer(page + 1)
+                    if next_page_xp then
+                        local last_word_xp = doc:getPrevVisibleWordStart(next_page_xp)
+                        if last_word_xp then
+                            pos = last_word_xp
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     local current_progress = {
         page = page,
         percentage = percentage,
-        pos = paging_module and paging_module.getLastProgress and paging_module:getLastProgress(),
+        pos = pos,
         timestamp = os.date("%Y-%m-%d %H:%M:%S"),
     }
 
