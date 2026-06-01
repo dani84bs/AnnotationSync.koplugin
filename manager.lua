@@ -79,7 +79,7 @@ function SyncManager:syncProgress()
     -- Ensure the local sidecar directory exists
     if not lfs.attributes(sdr_dir, "mode") then
         logger.info("AnnotationSync: creating missing sidecar directory: " .. sdr_dir)
-        os.execute("mkdir -p " .. sdr_dir)
+        util.makePath(sdr_dir)
     end
 
     local filename = self:_getProgressFilename(file)
@@ -128,11 +128,7 @@ function SyncManager:syncProgress()
 
     local_data[device_id] = current_progress
 
-    local f = io.open(json_path, "w")
-    if f then
-        f:write(json.encode(local_data))
-        f:close()
-
+    if util.writeToFile(json.encode(local_data), json_path, true, false, true) then
         logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
         UIManager:scheduleIn(0.1, function()
             remote.push_progress_bg(self.plugin, json_path, function(success)
@@ -313,7 +309,7 @@ function SyncManager:writeAnnotationsJSON(document)
     -- Fix for Issue #34: Ensure the local sidecar directory exists
     if not lfs.attributes(sdr_dir, "mode") then
         logger.info("AnnotationSync: creating missing sidecar directory: " .. sdr_dir)
-        os.execute("mkdir -p " .. sdr_dir)
+        util.makePath(sdr_dir)
     end
 
     local filename = self:_getAnnotationFilename(file)
@@ -370,12 +366,9 @@ end
 
 function SyncManager:writeChangedDocumentsFile(changed_docs)
     local track_path = self:changedDocumentsFile()
-    local f = io.open(track_path, "w")
-    if f then
-        f:write("return ", self:_serialize_table(changed_docs), "\n")
-        f:close()
-    else
-        logger.warn("AnnotationSync: Failed to open changed documents file: " .. track_path)
+    local ok, err = util.writeToFile(self:_serialize_table(changed_docs), track_path, true, true, true)
+    if not ok then
+        logger.warn("AnnotationSync: Failed to write changed documents file: " .. track_path .. " (" .. tostring(err) .. ")")
     end
 end
 

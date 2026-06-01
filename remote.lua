@@ -3,6 +3,7 @@ local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local T = require("ffi/util").template
 local _ = require("gettext")
+local util = require("util")
 
 local annotations = require("annotations")
 local utils = require("utils")
@@ -57,11 +58,7 @@ function M._sync_progress_callback(local_file, cached_file, income_file)
     end
 
     if changed then
-        local f = io.open(local_file, "w")
-        if f then
-            f:write(json.encode(local_data))
-            f:close()
-        end
+        util.writeToFile(json.encode(local_data), local_file, true, false, true)
     end
 
     return true, local_data
