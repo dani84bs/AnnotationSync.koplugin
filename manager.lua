@@ -81,52 +81,16 @@ function SyncManager:checkPendingSync()
     end
 end
 
-function SyncManager:syncProgress()
-    if self.is_syncing then
-        self.has_pending_sync = true
-        return
-    end
-    self.is_syncing = true
-    self.has_pending_sync = false
-
-    if not NetworkMgr:isConnected() then
-        logger.info("AnnotationSync: network is disconnected, skipping progress sync")
-        self.is_syncing = false
-        self:checkPendingSync()
-        return
-    end
-
-    logger.info("AnnotationSync: starting progress sync")
-
-    local document = self.plugin.ui and self.plugin.ui.document
-    if not document then
-        self.is_syncing = false
-        self:checkPendingSync()
-        return
-    end
-
+function SyncManager:saveLocalProgress(document, json_path)
     local file = document.file
-    if not file then
-        self.is_syncing = false
-        self:checkPendingSync()
-        return
-    end
-
     local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then
-        self.is_syncing = false
-        self:checkPendingSync()
-        return
-    end
+    if not sdr_dir or sdr_dir == "" then return false end
 
     -- Ensure the local sidecar directory exists
     if not lfs.attributes(sdr_dir, "mode") then
         logger.info("AnnotationSync: creating missing sidecar directory: " .. sdr_dir)
         util.makePath(sdr_dir)
     end
-
-    local filename = self:_getProgressFilename(file)
-    local json_path = sdr_dir .. "/" .. filename
 
     local device_id = Device.model or "unknown"
     local page = self.plugin.ui:getCurrentPage()
@@ -198,7 +162,51 @@ function SyncManager:syncProgress()
 
     local_data[device_id] = current_progress
 
-    if util.writeToFile(json.encode(local_data), json_path, true, false, true) then
+    return util.writeToFile(json.encode(local_data), json_path, true, false, true)
+end
+
+function SyncManager:syncProgress()
+    if self.is_syncing then
+        self.has_pending_sync = true
+        return
+    end
+    self.is_syncing = true
+    self.has_pending_sync = false
+
+    if not NetworkMgr:isConnected() then
+        logger.info("AnnotationSync: network is disconnected, skipping progress sync")
+        self.is_syncing = false
+        self:checkPendingSync()
+        return
+    end
+
+    logger.info("AnnotationSync: starting progress sync")
+
+    local document = self.plugin.ui and self.plugin.ui.document
+    if not document then
+        self.is_syncing = false
+        self:checkPendingSync()
+        return
+    end
+
+    local file = document.file
+    if not file then
+        self.is_syncing = false
+        self:checkPendingSync()
+        return
+    end
+
+    local sdr_dir = docsettings:getSidecarDir(file)
+    if not sdr_dir or sdr_dir == "" then
+        self.is_syncing = false
+        self:checkPendingSync()
+        return
+    end
+
+    local filename = self:_getProgressFilename(file)
+    local json_path = sdr_dir .. "/" .. filename
+
+    if self:saveLocalProgress(document, json_path) then
         logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
         UIManager:scheduleIn(0.1, function()
             remote.push_progress_bg(self.plugin, json_path, function(success)
@@ -240,6 +248,9 @@ function SyncManager:pullProgress()
 
     local filename = self:_getProgressFilename(file)
     local json_path = sdr_dir .. "/" .. filename
+
+    -- Ensure local progress is saved so local file and sidecar dir exist before pulling
+    self:saveLocalProgress(document, json_path)
 
     utils.show_msg(_("Fetching remote progress..."))
     remote.pull_progress(self.plugin, json_path, function(success, merged_data)

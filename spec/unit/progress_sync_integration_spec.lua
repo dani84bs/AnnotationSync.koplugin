@@ -409,6 +409,71 @@ describe("Reading Progress Sync Integration", function()
         remote.pull_progress = old_pull
     end)
 
+    it("handles pullProgress when local progress file and directory are missing", function()
+        local remote = require("remote")
+        local device_id = "RemoteDevice"
+        local remote_data = {
+            [device_id] = {
+                page = 10,
+                percentage = 0.5,
+                timestamp = "2026-04-14 12:00:00"
+            }
+        }
+
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local hash = util.partialMD5(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+
+        -- Remove files and directory to simulate missing state
+        os.execute("rm -rf " .. sdr_dir)
+
+        -- Verify it is missing
+        assert.is_nil(require("libs/libkoreader-lfs").attributes(sdr_dir, "mode"))
+
+        local old_pull = remote.pull_progress
+        local dir_existed_on_pull = false
+        local file_existed_on_pull = false
+
+        remote.pull_progress = function(widget, path, callback)
+            dir_existed_on_pull = (require("libs/libkoreader-lfs").attributes(sdr_dir, "mode") == "directory")
+            local f = io.open(path, "r")
+            if f then
+                file_existed_on_pull = true
+                f:close()
+            end
+            callback(true, remote_data)
+        end
+
+        local menu_shown = false
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                menu_shown = true
+                for _, item in ipairs(widget.item_table) do
+                    if item.text:find(device_id) then
+                        item.callback()
+                        break
+                    end
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        local old_broadcast = UIManager.broadcastEvent
+        UIManager.broadcastEvent = function(this, event) end
+
+        sync_instance.manager:pullProgress()
+
+        assert.is_true(dir_existed_on_pull)
+        assert.is_true(file_existed_on_pull)
+        assert.is_true(menu_shown)
+
+        UIManager.show = old_UIManager_show
+        UIManager.broadcastEvent = old_broadcast
+        remote.pull_progress = old_pull
+    end)
+
     it("retrieves progress from rolling module when paging is missing", function()
         local remote = require("remote")
         local old_push = remote.push_progress_bg
