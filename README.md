@@ -62,7 +62,7 @@ To configure multi-device reading progress synchronization:
   - **Tools** -> **Annotation Sync** -> **Sync All**
 - **Automatic Syncing:** Automatically mass-sync all modified documents as soon as a network connection becomes available.
   - **Tools** -> **Annotation Sync** -> **Settings** -> **Automatically Sync All when network becomes available**
-- **Shortcuts:** You can bind "Annotation Sync: Manual Sync" to any gesture or add it to a profile action list in KOReader.
+- **Shortcuts:** You can bind "Annotation Sync: Manual Sync" or "Annotation Sync: Jump to device progress" to any gesture or add them to a profile action list in KOReader.
 
 ### 🗑 Managing Deletions (Trash Bin)
 

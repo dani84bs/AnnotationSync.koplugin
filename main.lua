@@ -26,6 +26,7 @@ local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservi
 
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
+local jump_to_device_progress_description = "Jump to the reading progress of another device."
 
 local AnnotationSyncPlugin = WidgetContainer:extend {
     -- see also: _meta.lua
@@ -335,6 +336,20 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     return true
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
+    if not self.ui.cloudstorage then
+        utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
+        return true
+    end
+    local document = self.ui and self.ui.document
+    if not document or not document.file then
+        utils.show_msg(_("A document must be active to jump to device progress."))
+        return true
+    end
+    self.manager:pullProgress()
+    return true
+end
+
 function AnnotationSyncPlugin:onPageUpdate(page_pos)
     if self.manager then
         self.manager:onPageUpdate(page_pos)
@@ -371,6 +386,14 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         event = "AnnotationSyncManualSync",
         title = _("AnnotationSync: Manual Sync"),
         text = _(manual_sync_description),
+        separator = true,
+        reader = true
+    })
+    Dispatcher:registerAction("annotation_sync_jump_to_device_progress", {
+        category = "none",
+        event = "AnnotationSyncJumpToDeviceProgress",
+        title = _("AnnotationSync: Jump to device progress"),
+        text = _(jump_to_device_progress_description),
         separator = true,
         reader = true
     })
