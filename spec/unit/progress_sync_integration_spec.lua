@@ -411,6 +411,7 @@ describe("Reading Progress Sync Integration", function()
 
     it("handles pullProgress when local progress file and directory are missing", function()
         local remote = require("remote")
+        local docsettings = require("frontend/docsettings")
         local device_id = "RemoteDevice"
         local remote_data = {
             [device_id] = {
@@ -420,22 +421,26 @@ describe("Reading Progress Sync Integration", function()
             }
         }
 
-        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local test_sdr_dir = test_data_dir .. "/non_existent_sdr"
         local hash = util.partialMD5(readerui.document.file)
-        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        local json_path = test_sdr_dir .. "/" .. hash .. ".progress.json"
 
-        -- Remove files and directory to simulate missing state
-        os.execute("rm -rf " .. sdr_dir)
+        -- Mock getSidecarDir to return a unique temp directory
+        local old_getSidecarDir = docsettings.getSidecarDir
+        docsettings.getSidecarDir = function(this, file)
+            return test_sdr_dir
+        end
 
-        -- Verify it is missing
-        assert.is_nil(require("libs/libkoreader-lfs").attributes(sdr_dir, "mode"))
+        -- Ensure the temp directory doesn't exist
+        os.execute("rm -rf " .. test_sdr_dir)
+        assert.is_nil(require("libs/libkoreader-lfs").attributes(test_sdr_dir, "mode"))
 
         local old_pull = remote.pull_progress
         local dir_existed_on_pull = false
         local file_existed_on_pull = false
 
         remote.pull_progress = function(widget, path, callback)
-            dir_existed_on_pull = (require("libs/libkoreader-lfs").attributes(sdr_dir, "mode") == "directory")
+            dir_existed_on_pull = (require("libs/libkoreader-lfs").attributes(test_sdr_dir, "mode") == "directory")
             local f = io.open(path, "r")
             if f then
                 file_existed_on_pull = true
@@ -472,6 +477,8 @@ describe("Reading Progress Sync Integration", function()
         UIManager.show = old_UIManager_show
         UIManager.broadcastEvent = old_broadcast
         remote.pull_progress = old_pull
+        docsettings.getSidecarDir = old_getSidecarDir
+        os.execute("rm -rf " .. test_sdr_dir)
     end)
 
     it("retrieves progress from rolling module when paging is missing", function()
