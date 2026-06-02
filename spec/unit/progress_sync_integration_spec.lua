@@ -735,4 +735,56 @@ describe("Reading Progress Sync Integration", function()
 
         remote.push_progress_bg = old_push
     end)
+
+    it("handles onAnnotationSyncJumpToDeviceProgress events correctly", function()
+        local pull_called = false
+        local old_pull = sync_instance.manager.pullProgress
+        sync_instance.manager.pullProgress = function(this)
+            pull_called = true
+        end
+
+        local msg_shown
+        local old_show_msg = _G.utils.show_msg
+        _G.utils.show_msg = function(msg)
+            msg_shown = msg
+        end
+
+        -- Case 1: cloudstorage is missing/disabled
+        local old_cloudstorage = sync_instance.ui.cloudstorage
+        sync_instance.ui.cloudstorage = nil
+        
+        local res = sync_instance:onAnnotationSyncJumpToDeviceProgress()
+        assert.is_true(res)
+        assert.is_false(pull_called)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("not supported") ~= nil)
+
+        -- Reset cloudstorage for other cases
+        sync_instance.ui.cloudstorage = old_cloudstorage
+        msg_shown = nil
+
+        -- Case 2: No active document
+        local old_document = sync_instance.ui.document
+        sync_instance.ui.document = nil
+
+        res = sync_instance:onAnnotationSyncJumpToDeviceProgress()
+        assert.is_true(res)
+        assert.is_false(pull_called)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("A document must be active") ~= nil)
+
+        -- Reset document
+        sync_instance.ui.document = old_document
+        msg_shown = nil
+
+        -- Case 3: Successful pull
+        res = sync_instance:onAnnotationSyncJumpToDeviceProgress()
+        assert.is_true(res)
+        assert.is_true(pull_called)
+        assert.is_nil(msg_shown)
+
+        -- Clean up mocks
+        sync_instance.manager.pullProgress = old_pull
+        _G.utils.show_msg = old_show_msg
+    end)
 end)
