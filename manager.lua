@@ -24,7 +24,13 @@ function SyncManager:new(plugin)
         page_turn_counter = 0,
         last_page = 0,
         is_syncing = false,
+        sync_progress_scheduled = false,
+        has_pending_sync = false,
     }
+    o.sync_progress_task = function()
+        o.sync_progress_scheduled = false
+        o:syncProgress()
+    end
     setmetatable(o, self)
     self.__index = self
     return o
@@ -42,17 +48,51 @@ function SyncManager:onPageUpdate(page_pos)
 
     if self.page_turn_counter >= self.plugin.settings.progress_sync_interval then
         self.page_turn_counter = 0
+        if self.sync_progress_scheduled then
+            UIManager:unschedule(self.sync_progress_task)
+        end
+        UIManager:scheduleIn(3, self.sync_progress_task)
+        self.sync_progress_scheduled = true
+    end
+end
+
+function SyncManager:onCloseDocument()
+    if self.sync_progress_scheduled then
+        UIManager:unschedule(self.sync_progress_task)
+        self.sync_progress_scheduled = false
         self:syncProgress()
     end
 end
 
+function SyncManager:onSuspend()
+    if self.sync_progress_scheduled then
+        UIManager:unschedule(self.sync_progress_task)
+        self.sync_progress_scheduled = false
+        self:syncProgress()
+    end
+end
+
+function SyncManager:checkPendingSync()
+    if self.has_pending_sync then
+        self.has_pending_sync = false
+        UIManager:nextTick(function()
+            self:syncProgress()
+        end)
+    end
+end
+
 function SyncManager:syncProgress()
-    if self.is_syncing then return end
+    if self.is_syncing then
+        self.has_pending_sync = true
+        return
+    end
     self.is_syncing = true
+    self.has_pending_sync = false
 
     if not NetworkMgr:isConnected() then
         logger.info("AnnotationSync: network is disconnected, skipping progress sync")
         self.is_syncing = false
+        self:checkPendingSync()
         return
     end
 
@@ -61,18 +101,21 @@ function SyncManager:syncProgress()
     local document = self.plugin.ui and self.plugin.ui.document
     if not document then
         self.is_syncing = false
+        self:checkPendingSync()
         return
     end
 
     local file = document.file
     if not file then
         self.is_syncing = false
+        self:checkPendingSync()
         return
     end
 
     local sdr_dir = docsettings:getSidecarDir(file)
     if not sdr_dir or sdr_dir == "" then
         self.is_syncing = false
+        self:checkPendingSync()
         return
     end
 
@@ -165,11 +208,13 @@ function SyncManager:syncProgress()
                 else
                     logger.warn("AnnotationSync: progress sync failed")
                 end
+                self:checkPendingSync()
             end)
         end)
     else
         logger.warn("AnnotationSync: failed to write progress JSON: " .. json_path)
         self.is_syncing = false
+        self:checkPendingSync()
     end
 end
 

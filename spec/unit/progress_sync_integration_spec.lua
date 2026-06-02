@@ -103,7 +103,8 @@ describe("Reading Progress Sync Integration", function()
         -- Page 2: counter becomes 2, triggers sync, resets to 0
         readerui.document.page = 2
         sync_instance:onPageUpdate()
-        fastforward_ui_events() -- Trigger scheduled sync
+        fastforward_ui_events() -- Trigger scheduled sync (debounce)
+        fastforward_ui_events() -- Trigger nested sync schedule
         assert.is_equal(1, push_called)
         assert.is_equal(0, sync_instance.manager.page_turn_counter)
 
@@ -116,7 +117,8 @@ describe("Reading Progress Sync Integration", function()
         -- Page 4: counter becomes 2, triggers sync, resets to 0
         readerui.document.page = 4
         sync_instance:onPageUpdate()
-        fastforward_ui_events() -- Trigger scheduled sync
+        fastforward_ui_events() -- Trigger scheduled sync (debounce)
+        fastforward_ui_events() -- Trigger nested sync schedule
         assert.is_equal(2, push_called)
         assert.is_equal(0, sync_instance.manager.page_turn_counter)
 
@@ -568,6 +570,97 @@ describe("Reading Progress Sync Integration", function()
         readerui.document.getPageXPointer = old_getPageXPointer
         readerui.document.getPrevVisibleWordStart = old_getPrevVisibleWordStart
         readerui.document.isXPointerInDocument = old_isXPointerInDocument
+        remote.push_progress_bg = old_push
+    end)
+
+    it("debounces progress sync and queues pending syncs when already syncing", function()
+        local remote = require("remote")
+        local push_called = 0
+        local old_push = remote.push_progress_bg
+        local cb_trigger
+        
+        remote.push_progress_bg = function(widget, path, callback)
+            push_called = push_called + 1
+            cb_trigger = callback
+        end
+
+        -- Page 1 -> 2: triggers interval (interval = 2)
+        readerui.document.page = 1
+        sync_instance:onPageUpdate()
+        readerui.document.page = 2
+        sync_instance:onPageUpdate()
+
+        -- No push called immediately because of 3s debounce timer
+        assert.is_equal(0, push_called)
+
+        -- Fast forward events to run the 3s timer and the 0.1s nested schedule
+        fastforward_ui_events()
+        fastforward_ui_events()
+        assert.is_equal(1, push_called)
+        
+        -- While the first sync is running (cb_trigger not called yet, so is_syncing is true),
+        -- turn pages again to trigger another sync schedule
+        readerui.document.page = 3
+        sync_instance:onPageUpdate()
+        readerui.document.page = 4
+        sync_instance:onPageUpdate()
+
+        -- Wait for debounce timer to fire
+        fastforward_ui_events()
+        -- Should still be 1 because is_syncing is true, but has_pending_sync should be set
+        assert.is_equal(1, push_called)
+        assert.is_true(sync_instance.manager.has_pending_sync)
+
+        -- Now trigger the first sync's callback.
+        -- This should complete the first sync and immediately trigger the pending sync on nextTick
+        cb_trigger(true)
+        fastforward_ui_events() -- Runs nextTick and schedules push_progress_bg
+        fastforward_ui_events() -- Runs 0.1s schedule
+        assert.is_equal(2, push_called)
+        assert.is_false(sync_instance.manager.has_pending_sync)
+
+        remote.push_progress_bg = old_push
+    end)
+
+    it("flushes pending sync immediately on onCloseDocument or onSuspend", function()
+        local remote = require("remote")
+        local push_called = 0
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(widget, path, callback)
+            push_called = push_called + 1
+            callback(true)
+        end
+
+        -- Page 1 -> 2: triggers interval (interval = 2)
+        readerui.document.page = 1
+        sync_instance:onPageUpdate()
+        readerui.document.page = 2
+        sync_instance:onPageUpdate()
+
+        -- Should not be pushed immediately
+        assert.is_equal(0, push_called)
+
+        -- Call onCloseDocument
+        sync_instance:onCloseDocument()
+        fastforward_ui_events()
+
+        assert.is_equal(1, push_called)
+
+        -- Reset for onSuspend
+        sync_instance.manager.page_turn_counter = 0
+        readerui.document.page = 3
+        sync_instance:onPageUpdate()
+        readerui.document.page = 4
+        sync_instance:onPageUpdate()
+
+        assert.is_equal(1, push_called)
+
+        -- Call onSuspend
+        sync_instance:onSuspend()
+        fastforward_ui_events()
+
+        assert.is_equal(2, push_called)
+
         remote.push_progress_bg = old_push
     end)
 end)

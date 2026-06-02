@@ -353,6 +353,18 @@ function AnnotationSyncPlugin:onPagePositionUpdated(page_pos)
     end
 end
 
+function AnnotationSyncPlugin:onCloseDocument()
+    if self.manager then
+        self.manager:onCloseDocument()
+    end
+end
+
+function AnnotationSyncPlugin:onSuspend()
+    if self.manager then
+        self.manager:onSuspend()
+    end
+end
+
 function AnnotationSyncPlugin:onDispatcherRegisterActions()
     Dispatcher:registerAction("annotation_sync_manual_sync", {
         category = "none",
