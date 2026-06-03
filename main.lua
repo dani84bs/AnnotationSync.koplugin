@@ -90,11 +90,30 @@ function AnnotationSyncPlugin:init()
         G_reader_settings:delSetting("annotation_sync_use_filename")
     end
 
+    self.settings_key = self.plugin_id
+
     self:registerEvents()
 end
 
 function AnnotationSyncPlugin:saveSettings()
     G_reader_settings:saveSetting(self.plugin_id, self.settings)
+end
+
+function AnnotationSyncPlugin:deletePluginSettings()
+    G_reader_settings:delSetting(self.plugin_id)
+    G_reader_settings:delSetting("cloud_server_object")
+    G_reader_settings:delSetting("cloud_download_dir")
+    G_reader_settings:delSetting("cloud_provider_type")
+
+    local track_path
+    if self.manager then
+        track_path = self.manager:changedDocumentsFile()
+    else
+        track_path = DataStorage:getDataDir() .. "/changed_documents.lua"
+    end
+    if track_path and util.fileExists(track_path) then
+        os.remove(track_path)
+    end
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)

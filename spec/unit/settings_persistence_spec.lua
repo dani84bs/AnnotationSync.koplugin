@@ -140,4 +140,33 @@ describe("AnnotationSync Settings Persistence", function()
         assert.is_equal("http://test-server-confirm", G_reader_settings:readSetting("cloud_download_dir"))
         assert.is_equal("dropbox", G_reader_settings:readSetting("cloud_provider_type"))
     end)
+
+    it("should clean up settings and files on deletePluginSettings", function()
+        -- 1. Verify settings_key is exposed
+        assert.is_equal(sync_instance.plugin_id, sync_instance.settings_key)
+
+        -- 2. Setup values in G_reader_settings
+        G_reader_settings:saveSetting(sync_instance.plugin_id, { foo = "bar" })
+        G_reader_settings:saveSetting("cloud_server_object", "{}")
+        G_reader_settings:saveSetting("cloud_download_dir", "http://test")
+        G_reader_settings:saveSetting("cloud_provider_type", "dropbox")
+
+        -- 3. Setup a mock changed_documents.lua file
+        local util = require("util")
+        local track_path = sync_instance.manager:changedDocumentsFile()
+        assert.is_true(util.writeToFile("return {}", track_path, true, true, true))
+        assert.is_true(util.fileExists(track_path))
+
+        -- 4. Call deletePluginSettings
+        sync_instance:deletePluginSettings()
+
+        -- 5. Verify settings are deleted
+        assert.is_nil(G_reader_settings:readSetting(sync_instance.plugin_id))
+        assert.is_nil(G_reader_settings:readSetting("cloud_server_object"))
+        assert.is_nil(G_reader_settings:readSetting("cloud_download_dir"))
+        assert.is_nil(G_reader_settings:readSetting("cloud_provider_type"))
+
+        -- 6. Verify the tracking file is deleted
+        assert.is_nil(util.fileExists(track_path))
+    end)
 end)
