@@ -76,6 +76,28 @@ AnnotationSync keeps track of deleted annotations so you can recover them:
 Setting up Dropbox on KOReader can be a little bit difficult. 
 [This excellent post on the MobileRead forum](https://www.mobileread.com/forums/showthread.php?t=353670) explains the procedure in detail.
 
+## 📦 Koofr (WebDAV) Setup
+
+Koofr is a cloud storage provider that supports WebDAV. Connecting KOReader to Koofr via WebDAV requires a dedicated application password instead of your primary Koofr password.
+
+### 1. Generate an Application Password on Koofr
+1. Log in to the [Koofr Web App](https://app.koofr.net/).
+2. Open your account menu and go to **Preferences**.
+3. Select **Password** from the menu on the left.
+4. Go to the **Generate new password** section, enter a name (e.g., `KOReader`), and click **Generate**.
+5. Copy the generated password. *Note: You will not be able to see it again after leaving the page.*
+
+### 2. Configure WebDAV in KOReader
+1. Go to **Tools** -> **Annotation Sync** -> **Settings** -> **Cloud settings**.
+2. If this is your first time, choose **Add WebDAV server**. Otherwise, select your existing WebDAV configuration.
+3. Fill in the following connection settings:
+   - **Name**: `Koofr` (or any name of your choice)
+   - **WebDAV address**: `https://app.koofr.net/dav/Koofr`
+   - **Username**: Your Koofr account email address
+   - **Password**: The application-specific password generated in Step 1 (do **not** use your primary Koofr login password)
+   - **Start folder**: `/koreader` or `/AnnotationSync` (Recommended to keep sync files organized in a dedicated directory. Alternatively, you can use `/` for the root directory, but you must ensure any custom subfolders are created in Koofr beforehand.)
+4. Tap **Save** and restart KOReader if prompted.
+
 ## 🧪 Running Tests
 
 The project includes a comprehensive integration test suite. To run them, you need a KOReader development environment (`kodev`).
