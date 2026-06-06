@@ -263,6 +263,12 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             UIManager:show(input)
                         end,
                     },
+                    {
+                        text = _("Show changed settings"),
+                        callback = function()
+                            self:showChangedSettings()
+                        end,
+                    },
                 },
                 separator = true,
             },
@@ -620,6 +626,187 @@ function AnnotationSyncPlugin:onAnnotationsModified(annotations)
             self.manager:addToChangedDocumentsFile(changed_file)
         end
     end
+end
+
+function AnnotationSyncPlugin:showChangedSettings()
+    local diffs = {}
+    local excluded = {
+        -- Global reader settings (settings.reader.lua)
+        ["reader:device_id"] = true,
+        ["reader:device_name"] = true,
+        ["reader:lastfile"] = true,
+        ["reader:home_dir"] = true,
+        ["reader:fontmap"] = true,
+        ["reader:color_rendering"] = true,
+        ["reader:folder_shortcuts_settings"] = true,
+        ["reader:cloud_server_object"] = true,
+        ["reader:cloud_download_dir"] = true,
+        ["reader:cloud_provider_type"] = true,
+        ["reader:dict_presets"] = true,
+        ["reader:dicts_disabled"] = true,
+        ["reader:dicts_order"] = true,
+        ["reader:input_ignore_gsensor"] = true,
+        ["reader:input_lock_gsensor"] = true,
+        ["reader:input_invert_page_turn_keys"] = true,
+        ["reader:input_invert_left_page_turn_keys"] = true,
+        ["reader:input_invert_right_page_turn_keys"] = true,
+        ["reader:timezone"] = true,
+        ["reader:annotation_sync_plugin.last_sync"] = true,
+        ["reader:sdl_window"] = true,
+
+        -- Plugin settings / databases / logs
+        ["settings/cloudstorage"] = true,
+        ["settings/battery_stats"] = true,
+        ["settings/profiles"] = true,
+        ["settings/terminal"] = true,
+        ["settings/bookinfo_cache"] = true,
+        ["settings/statistics"] = true,
+        ["settings/vocabulary_builder"] = true,
+    }
+
+    local function format_val(val)
+        if val == nil then
+            return "nil"
+        elseif type(val) == "boolean" then
+            return val and "true" or "false"
+        elseif type(val) == "table" then
+            return "{table}"
+        else
+            return tostring(val)
+        end
+    end
+
+    local function is_excluded(domain, path)
+        local full_path = domain .. ":" .. table.concat(path, ".")
+        if excluded[full_path] then
+            return true
+        end
+        for i = 1, #path do
+            local sub_path = domain .. ":" .. table.concat(path, ".", 1, i)
+            if excluded[sub_path] then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function table_diff(domain, vanilla, active, path)
+        if is_excluded(domain, path) then
+            return
+        end
+
+        if type(vanilla) ~= "table" and type(active) ~= "table" then
+            if vanilla ~= active then
+                table.insert(diffs, {
+                    domain = domain,
+                    key = table.concat(path, "."),
+                    vanilla = format_val(vanilla),
+                    active = format_val(active)
+                })
+            end
+            return
+        end
+
+        local v_is_table = type(vanilla) == "table"
+        local a_is_table = type(active) == "table"
+
+        if v_is_table ~= a_is_table then
+            table.insert(diffs, {
+                domain = domain,
+                key = table.concat(path, "."),
+                vanilla = format_val(vanilla),
+                active = format_val(active)
+            })
+            return
+        end
+
+        -- Both are tables
+        local all_keys = {}
+        for k in pairs(vanilla) do
+            all_keys[k] = true
+        end
+        for k in pairs(active) do
+            all_keys[k] = true
+        end
+
+        for k in pairs(all_keys) do
+            table.insert(path, k)
+            table_diff(domain, vanilla[k], active[k], path)
+            table.remove(path)
+        end
+    end
+
+    -- 1. Compare settings.reader.lua
+    local vanilla_reader_path = self.path .. "/defaults/settings.reader.lua"
+    local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
+    local ok_v, vanilla_reader = pcall(dofile, vanilla_reader_path)
+    local ok_a, active_reader = pcall(dofile, active_reader_path)
+    
+    table_diff("reader", ok_v and vanilla_reader or {}, ok_a and active_reader or {}, {})
+
+    -- 2. Compare defaults.custom.lua
+    local vanilla_defaults_path = self.path .. "/defaults/defaults.custom.lua"
+    local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
+    local ok_vd, vanilla_defaults = pcall(dofile, vanilla_defaults_path)
+    local ok_ad, active_defaults = pcall(dofile, active_defaults_path)
+
+    table_diff("defaults", ok_vd and vanilla_defaults or {}, ok_ad and active_defaults or {}, {})
+
+    -- 3. Compare files in settings/ directory
+    local vanilla_settings_dir = self.path .. "/defaults/settings"
+    local active_settings_dir = DataStorage:getSettingsDir()
+    
+    if lfs.attributes(vanilla_settings_dir, "mode") == "directory" then
+        for entry in lfs.dir(vanilla_settings_dir) do
+            if entry ~= "." and entry ~= ".." then
+                local filepath = vanilla_settings_dir .. "/" .. entry
+                local mode = lfs.attributes(filepath, "mode")
+                if mode == "file" and entry:match("%.lua$") then
+                    local name = entry:gsub("%.lua$", "")
+                    local domain = "settings/" .. name
+                    if not excluded[domain] then
+                        local ok_vs, v_tbl = pcall(dofile, filepath)
+                        local ok_as, a_tbl = pcall(dofile, active_settings_dir .. "/" .. entry)
+                        table_diff(domain, ok_vs and v_tbl or {}, ok_as and a_tbl or {}, {})
+                    end
+                end
+            end
+        end
+    end
+
+    -- Sort diffs by domain and key
+    table.sort(diffs, function(a, b)
+        if a.domain ~= b.domain then
+            return a.domain < b.domain
+        end
+        return a.key < b.key
+    end)
+
+    -- Build and show Menu
+    local Menu = require("ui/widget/menu")
+    local menu_items = {}
+    
+    if #diffs == 0 then
+        table.insert(menu_items, {
+            text = _("No changed settings found."),
+            enabled = false
+        })
+    else
+        for _, diff in ipairs(diffs) do
+            local text = string.format("[%s] %s: %s -> %s", 
+                diff.domain, diff.key, diff.vanilla, diff.active)
+            table.insert(menu_items, {
+                text = text,
+                callback = function() end
+            })
+        end
+    end
+
+    local diff_menu = Menu:new{
+        title = _("Changed Settings"),
+        item_table = menu_items,
+    }
+    UIManager:show(diff_menu)
 end
 
 return AnnotationSyncPlugin
