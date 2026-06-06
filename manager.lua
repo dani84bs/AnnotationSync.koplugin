@@ -276,15 +276,18 @@ function SyncManager:showJumpMenu(progress_map)
 
     local device_id = self:getDeviceName()
 
-    -- Sort devices by timestamp descending
+    -- Sort devices by percentage descending, breaking ties alphabetically by device name
     local devices = {}
     for dev_id, data in pairs(progress_map) do
         table.insert(devices, { id = dev_id, data = data })
     end
     table.sort(devices, function(a, b)
-        if not a.data.timestamp then return false end
-        if not b.data.timestamp then return true end
-        return a.data.timestamp > b.data.timestamp
+        local a_pct = a.data.percentage or 0
+        local b_pct = b.data.percentage or 0
+        if a_pct ~= b_pct then
+            return a_pct > b_pct
+        end
+        return a.id < b.id
     end)
 
     for idx, dev in ipairs(devices) do
