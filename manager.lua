@@ -81,6 +81,13 @@ function SyncManager:checkPendingSync()
     end
 end
 
+function SyncManager:getDeviceName()
+    if self.plugin.settings.device_name and self.plugin.settings.device_name ~= "" then
+        return self.plugin.settings.device_name
+    end
+    return Device.model or "unknown"
+end
+
 function SyncManager:saveLocalProgress(document, json_path)
     local file = document.file
     local sdr_dir = docsettings:getSidecarDir(file)
@@ -92,7 +99,7 @@ function SyncManager:saveLocalProgress(document, json_path)
         util.makePath(sdr_dir)
     end
 
-    local device_id = Device.model or "unknown"
+    local device_id = self:getDeviceName()
     local page = self.plugin.ui:getCurrentPage()
     local total = 0
     if self.plugin.ui.paging then
@@ -267,17 +274,20 @@ function SyncManager:showJumpMenu(progress_map)
     local menu_items = {}
     local jump_menu
 
-    local device_id = Device.model or "unknown"
+    local device_id = self:getDeviceName()
 
-    -- Sort devices by timestamp descending
+    -- Sort devices by percentage descending, breaking ties alphabetically by device name
     local devices = {}
     for dev_id, data in pairs(progress_map) do
         table.insert(devices, { id = dev_id, data = data })
     end
     table.sort(devices, function(a, b)
-        if not a.data.timestamp then return false end
-        if not b.data.timestamp then return true end
-        return a.data.timestamp > b.data.timestamp
+        local a_pct = a.data.percentage or 0
+        local b_pct = b.data.percentage or 0
+        if a_pct ~= b_pct then
+            return a_pct > b_pct
+        end
+        return a.id < b.id
     end)
 
     for idx, dev in ipairs(devices) do

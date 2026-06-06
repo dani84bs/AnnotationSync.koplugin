@@ -43,6 +43,7 @@ AnnotationSyncPlugin.default_settings = {
     progress_sync = false,
     progress_sync_interval = 1,
     progress_sync_last_word = false,
+    device_name = "",
 }
 
 function AnnotationSyncPlugin:init()
@@ -219,6 +220,44 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                                         end
                                         return true
                                     end
+                                end
+                            }
+                            UIManager:show(input)
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            local dev_name = self.settings.device_name
+                            if not dev_name or dev_name == "" then
+                                dev_name = require("device").model or "unknown"
+                            end
+                            return T(_("Device name: %1"), dev_name)
+                        end,
+                        enabled_func = function()
+                            return true
+                        end,
+                        callback = function()
+                            local default_dev_name = require("device").model or "unknown"
+                            local current_val = self.settings.device_name
+                            if not current_val or current_val == "" then
+                                current_val = default_dev_name
+                            end
+                            local input
+                            input = InputDialog:new{
+                                title = _("Set device name"),
+                                description = _("Leave empty to use the default device name."),
+                                input = current_val,
+                                save_callback = function(val)
+                                    local dev_name = val:gsub("^%s*(.-)%s*$", "%1")
+                                    if dev_name == default_dev_name then
+                                        dev_name = ""
+                                    end
+                                    self.settings.device_name = dev_name
+                                    self:saveSettings()
+                                    if self.ui.menu and self.ui.menu.showMainMenu then
+                                        self.ui.menu:showMainMenu()
+                                    end
+                                    return true
                                 end
                             }
                             UIManager:show(input)

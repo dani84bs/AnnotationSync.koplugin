@@ -263,6 +263,65 @@ describe("Reading Progress Sync Integration", function()
         remote.pull_progress = old_pull
     end)
 
+    it("orders devices by progress percentage descending and breaks ties alphabetically", function()
+        local remote = require("remote")
+        local remote_data = {
+            ["Device A"] = {
+                page = 78,
+                percentage = 0.78,
+                timestamp = "2026-04-14 12:00:00"
+            },
+            ["Device Z"] = {
+                page = 87,
+                percentage = 0.87,
+                timestamp = "2026-04-14 10:00:00"
+            },
+            ["Device B"] = {
+                page = 87,
+                percentage = 0.87,
+                timestamp = "2026-04-14 11:00:00"
+            },
+            ["Device C"] = {
+                page = 87,
+                percentage = 0.87,
+                timestamp = "2026-04-14 13:00:00"
+            }
+        }
+
+        local old_pull = remote.pull_progress
+        remote.pull_progress = function(widget, path, callback)
+            callback(true, remote_data)
+        end
+
+        local menu_items = {}
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                for _, item in ipairs(widget.item_table) do
+                    table.insert(menu_items, item.text)
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        sync_instance.manager:pullProgress()
+
+        -- Expected order based on descending percentage, then alphabetically:
+        -- 1. Device B (87% - B comes first)
+        -- 2. Device C (87% - C comes second)
+        -- 3. Device Z (87% - Z comes third)
+        -- 4. Device A (78% - lowest percentage)
+        assert.is_equal(4, #menu_items)
+        assert.is_not_nil(menu_items[1]:find("Device B"))
+        assert.is_not_nil(menu_items[2]:find("Device C"))
+        assert.is_not_nil(menu_items[3]:find("Device Z"))
+        assert.is_not_nil(menu_items[4]:find("Device A"))
+
+        UIManager.show = old_UIManager_show
+        remote.pull_progress = old_pull
+    end)
+
     it("includes 'pos' field in progress.json when available", function()
         local remote = require("remote")
         local old_push = remote.push_progress_bg
@@ -786,5 +845,86 @@ describe("Reading Progress Sync Integration", function()
         -- Clean up mocks
         sync_instance.manager.pullProgress = old_pull
         _G.utils.show_msg = old_show_msg
+    end)
+
+    it("uses custom device name in progress.json when configured", function()
+        local remote = require("remote")
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(widget, path, callback) callback(true) end
+
+        -- Set custom device name
+        sync_instance.settings.device_name = "MyCustomDevice"
+
+        local hash = util.partialMD5(readerui.document.file)
+        local sdr_dir = require("docsettings"):getSidecarDir(readerui.document.file)
+        local json_path = sdr_dir .. "/" .. hash .. ".progress.json"
+        os.remove(json_path)
+
+        -- Trigger sync
+        readerui.document.page = 5
+        sync_instance:onPageUpdate()
+        readerui.document.page = 6
+        sync_instance:onPageUpdate()
+        fastforward_ui_events() -- Trigger scheduled sync
+
+        local f = io.open(json_path, "r")
+        assert.is_not_nil(f)
+        local content = f:read("*all")
+        f:close()
+        
+        local data = json.decode(content)
+        assert.is_not_nil(data["MyCustomDevice"])
+        assert.is_equal(6, data["MyCustomDevice"].page)
+        assert.is_nil(data["TestDevice"])
+
+        -- Restore setting
+        sync_instance.settings.device_name = ""
+        remote.push_progress_bg = old_push
+    end)
+
+    it("identifies the custom device name as '(this device)' in the jump menu", function()
+        local remote = require("remote")
+        local remote_data = {
+            ["MyCustomDevice"] = {
+                page = 10,
+                percentage = 0.5,
+                timestamp = "2026-04-14 12:00:00"
+            },
+            ["OtherDevice"] = {
+                page = 15,
+                percentage = 0.75,
+                timestamp = "2026-04-14 12:05:00"
+            }
+        }
+
+        local old_pull = remote.pull_progress
+        remote.pull_progress = function(widget, path, callback)
+            callback(true, remote_data)
+        end
+
+        sync_instance.settings.device_name = "MyCustomDevice"
+
+        local this_device_matched = false
+        local old_UIManager_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Jump to device progress" then
+                for _, item in ipairs(widget.item_table) do
+                    if item.text:find("MyCustomDevice") and item.text:find("%(this device%)") then
+                        this_device_matched = true
+                    end
+                end
+            else
+                old_UIManager_show(this, widget)
+            end
+        end
+
+        sync_instance.manager:pullProgress()
+
+        assert.is_true(this_device_matched)
+
+        -- Clean up
+        sync_instance.settings.device_name = ""
+        UIManager.show = old_UIManager_show
+        remote.pull_progress = old_pull
     end)
 end)
