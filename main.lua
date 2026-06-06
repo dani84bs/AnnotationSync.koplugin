@@ -274,6 +274,13 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 separator = true,
             },
             {
+                text = _("Push settings to cloud"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                callback = function()
+                    self.manager:pushSettings()
+                end
+            },
+            {
                 text = _("Manual Sync"),
                 enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
                 hold_callback = function()
@@ -281,13 +288,6 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end,
                 callback = function()
                     self:manualSync()
-                end
-            },
-            {
-                text = _("Push settings to cloud"),
-                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
-                callback = function()
-                    self.manager:pushSettings()
                 end
             },
             {
