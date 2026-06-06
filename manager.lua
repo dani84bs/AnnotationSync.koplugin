@@ -81,6 +81,13 @@ function SyncManager:checkPendingSync()
     end
 end
 
+function SyncManager:getDeviceName()
+    if self.plugin.settings.device_name and self.plugin.settings.device_name ~= "" then
+        return self.plugin.settings.device_name
+    end
+    return Device.model or "unknown"
+end
+
 function SyncManager:saveLocalProgress(document, json_path)
     local file = document.file
     local sdr_dir = docsettings:getSidecarDir(file)
@@ -92,7 +99,7 @@ function SyncManager:saveLocalProgress(document, json_path)
         util.makePath(sdr_dir)
     end
 
-    local device_id = Device.model or "unknown"
+    local device_id = self:getDeviceName()
     local page = self.plugin.ui:getCurrentPage()
     local total = 0
     if self.plugin.ui.paging then
@@ -267,7 +274,7 @@ function SyncManager:showJumpMenu(progress_map)
     local menu_items = {}
     local jump_menu
 
-    local device_id = Device.model or "unknown"
+    local device_id = self:getDeviceName()
 
     -- Sort devices by timestamp descending
     local devices = {}
