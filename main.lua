@@ -21,6 +21,7 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 local SyncManager = require("manager")
+local SettingsSelection = require("settings_selection")
 
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
@@ -44,6 +45,7 @@ AnnotationSyncPlugin.default_settings = {
     progress_sync_interval = 1,
     progress_sync_last_word = false,
     device_name = "",
+    selected_settings = {},
 }
 
 function AnnotationSyncPlugin:init()
@@ -263,8 +265,28 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             UIManager:show(input)
                         end,
                     },
+                    {
+                        text = _("Show changed settings"),
+                        callback = function()
+                            self:showChangedSettings()
+                        end,
+                    },
                 },
                 separator = true,
+            },
+            {
+                text = _("Push settings to cloud"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                callback = function()
+                    self.manager:pushSettings()
+                end
+            },
+            {
+                text = _("Pull settings from cloud"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                callback = function()
+                    self.manager:pullSettings()
+                end
             },
             {
                 text = _("Manual Sync"),
@@ -394,6 +416,16 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     return true
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncPushSettings()
+    self.manager:pushSettings()
+    return true
+end
+
+function AnnotationSyncPlugin:onAnnotationSyncPullSettings()
+    self.manager:pullSettings()
+    return true
+end
+
 function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
     if not self.ui.cloudstorage then
         utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
@@ -446,6 +478,22 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         text = _(manual_sync_description),
         separator = true,
         reader = true
+    })
+    Dispatcher:registerAction("annotation_sync_push_settings", {
+        category = "none",
+        event = "AnnotationSyncPushSettings",
+        title = _("AnnotationSync: Push settings to cloud"),
+        text = _("Push the selected settings to the cloud."),
+        separator = true,
+        general = true
+    })
+    Dispatcher:registerAction("annotation_sync_pull_settings", {
+        category = "none",
+        event = "AnnotationSyncPullSettings",
+        title = _("AnnotationSync: Pull settings from cloud"),
+        text = _("Pull the selected settings from the cloud."),
+        separator = true,
+        general = true
     })
     Dispatcher:registerAction("annotation_sync_jump_to_device_progress", {
         category = "none",
@@ -620,6 +668,10 @@ function AnnotationSyncPlugin:onAnnotationsModified(annotations)
             self.manager:addToChangedDocumentsFile(changed_file)
         end
     end
+end
+
+function AnnotationSyncPlugin:showChangedSettings()
+    SettingsSelection.show(self)
 end
 
 return AnnotationSyncPlugin

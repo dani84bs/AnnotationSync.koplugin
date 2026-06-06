@@ -1,0 +1,27 @@
+-- ./settings/wallabag.lua
+return {
+    ["wallabag"] = {
+        ["archive_abandoned"] = false,
+        ["archive_finished"] = true,
+        ["archive_read"] = false,
+        ["articles_per_sync"] = 30,
+        ["auto_archive"] = false,
+        ["auto_tags"] = "",
+        ["delete_instead"] = false,
+        ["download_original_document"] = false,
+        ["file_block_timeout"] = 15,
+        ["file_total_timeout"] = 60,
+        ["filter_starred"] = false,
+        ["filter_tag"] = "",
+        ["ignore_tags"] = "",
+        ["large_block_timeout"] = 10,
+        ["large_total_timeout"] = 30,
+        ["offline_queue"] = {},
+        ["remove_abandoned_from_history"] = false,
+        ["remove_finished_from_history"] = false,
+        ["remove_read_from_history"] = false,
+        ["send_review_as_tags"] = false,
+        ["sync_remote_archive"] = false,
+        ["use_local_archive"] = false,
+    },
+}

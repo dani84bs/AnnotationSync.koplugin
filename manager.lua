@@ -592,4 +592,459 @@ function SyncManager:_serialize_table(tbl)
     return result
 end
 
+function SyncManager:getSelectedSettingsWithValues()
+    local selected = self.plugin.settings.selected_settings or {}
+    local has_any = false
+    for _, _ in pairs(selected) do
+        has_any = true
+        break
+    end
+    if not has_any then
+        return nil
+    end
+
+    -- Load active reader settings
+    local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
+    local ok_a, active_reader = pcall(dofile, active_reader_path)
+    if not ok_a or type(active_reader) ~= "table" then
+        active_reader = {}
+    end
+
+    -- Load active defaults settings
+    local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
+    local ok_ad, active_defaults = pcall(dofile, active_defaults_path)
+    if not ok_ad or type(active_defaults) ~= "table" then
+        active_defaults = {}
+    end
+
+    -- Cache for loaded settings files in settings/ directory
+    local settings_cache = {}
+
+    local function get_nested_value(tbl, path_str)
+        if not tbl then return nil end
+        local parts = {}
+        for part in string.gmatch(path_str, "([^%.]+)") do
+            table.insert(parts, part)
+        end
+        local current = tbl
+        for _, part in ipairs(parts) do
+            if type(current) ~= "table" then
+                return nil
+            end
+            current = current[part]
+        end
+        return current
+    end
+
+    local result = {}
+    for key, is_selected in pairs(selected) do
+        if is_selected then
+            local domain, full_key = key:match("^([^:]+):(.*)$")
+            if domain and full_key then
+                local val
+                if domain == "reader" then
+                    val = get_nested_value(active_reader, full_key)
+                elseif domain == "defaults" then
+                    val = get_nested_value(active_defaults, full_key)
+                elseif domain:match("^settings/") then
+                    local settings_name = domain:sub(10)
+                    if settings_cache[settings_name] == nil then
+                        local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
+                        local ok_s, a_tbl = pcall(dofile, filepath)
+                        if ok_s and type(a_tbl) == "table" then
+                            settings_cache[settings_name] = a_tbl
+                        else
+                            settings_cache[settings_name] = false
+                        end
+                    end
+                    local tbl = settings_cache[settings_name]
+                    if tbl then
+                        val = get_nested_value(tbl, full_key)
+                    end
+                end
+                result[key] = val
+            end
+        end
+    end
+
+    return result
+end
+
+function SyncManager:pushSettings()
+    local selected_values = self:getSelectedSettingsWithValues()
+    if not selected_values then
+        utils.show_msg(_("No settings are selected. Please select settings to sync in 'Show changed settings'."))
+        return
+    end
+
+    local device_id = self:getDeviceName()
+    local local_data = {
+        [device_id] = {
+            settings = selected_values,
+            timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+        }
+    }
+
+    local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
+    local ok, err = util.writeToFile(json.encode(local_data), json_path, true, false, true)
+    if not ok then
+        logger.warn("AnnotationSync: failed to write settings JSON: " .. json_path .. " (" .. tostring(err) .. ")")
+        utils.show_msg(_("Failed to write settings to local storage."))
+        return
+    end
+
+    logger.dbg("AnnotationSync: pushing settings to remote: " .. json_path)
+    utils.show_msg(_("Pushing settings to cloud..."))
+    remote.push_settings(self.plugin, json_path, function(success)
+        if success then
+            logger.dbg("AnnotationSync: settings push successful")
+        else
+            logger.warn("AnnotationSync: settings push failed")
+        end
+    end)
+end
+
+local function values_differ(v1, v2)
+    if type(v1) ~= type(v2) then
+        return true
+    end
+    if type(v1) == "table" then
+        return json.encode(v1) ~= json.encode(v2)
+    end
+    return v1 ~= v2
+end
+
+function SyncManager:getLocalSettingValue(key, caches)
+    caches = caches or {}
+    local domain, full_key = key:match("^([^:]+):(.*)$")
+    if not domain or not full_key then return nil end
+
+    local function get_nested_value(tbl, path_str)
+        if not tbl then return nil end
+        local parts = {}
+        for part in string.gmatch(path_str, "([^%.]+)") do
+            table.insert(parts, part)
+        end
+        local current = tbl
+        for _, part in ipairs(parts) do
+            if type(current) ~= "table" then
+                return nil
+            end
+            current = current[part]
+        end
+        return current
+    end
+
+    if domain == "reader" then
+        if caches.reader == nil then
+            local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
+            local ok, active_reader = pcall(dofile, active_reader_path)
+            caches.reader = ok and active_reader or {}
+        end
+        return get_nested_value(caches.reader, full_key)
+    elseif domain == "defaults" then
+        if caches.defaults == nil then
+            local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
+            local ok, active_defaults = pcall(dofile, active_defaults_path)
+            caches.defaults = ok and active_defaults or {}
+        end
+        return get_nested_value(caches.defaults, full_key)
+    elseif domain:match("^settings/") then
+        local settings_name = domain:sub(10)
+        if caches[settings_name] == nil then
+            local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
+            local ok, a_tbl = pcall(dofile, filepath)
+            caches[settings_name] = ok and a_tbl or false
+        end
+        local tbl = caches[settings_name]
+        if tbl then
+            return get_nested_value(tbl, full_key)
+        end
+    end
+    return nil
+end
+
+function SyncManager:writeLocalSettingValue(key, value)
+    local domain, full_key = key:match("^([^:]+):(.*)$")
+    if not domain or not full_key then return false end
+
+    local LuaSettings = require("luasettings")
+    local parts = {}
+    for part in string.gmatch(full_key, "([^%.]+)") do
+        table.insert(parts, part)
+    end
+
+    if domain == "reader" then
+        if #parts == 1 then
+            G_reader_settings:saveSetting(parts[1], value)
+        else
+            local top_key = parts[1]
+            local top_val = G_reader_settings:readSetting(top_key)
+            if type(top_val) ~= "table" then
+                top_val = {}
+            end
+            local new_tbl = util.tableDeepCopy(top_val)
+            local current = new_tbl
+            for i = 2, #parts - 1 do
+                local part = parts[i]
+                if type(current[part]) ~= "table" then
+                    current[part] = {}
+                end
+                current = current[part]
+            end
+            current[parts[#parts]] = value
+            G_reader_settings:saveSetting(top_key, new_tbl)
+        end
+        G_reader_settings:flush()
+
+        local filepath = DataStorage:getDataDir() .. "/settings.reader.lua"
+        local settings_obj = LuaSettings:open(filepath)
+        if #parts == 1 then
+            settings_obj:saveSetting(parts[1], value)
+        else
+            local top_key = parts[1]
+            local top_val = settings_obj:readSetting(top_key)
+            if type(top_val) ~= "table" then
+                top_val = {}
+            end
+            local new_tbl = util.tableDeepCopy(top_val)
+            local current = new_tbl
+            for i = 2, #parts - 1 do
+                local part = parts[i]
+                if type(current[part]) ~= "table" then
+                    current[part] = {}
+                end
+                current = current[part]
+            end
+            current[parts[#parts]] = value
+            settings_obj:saveSetting(top_key, new_tbl)
+        end
+        settings_obj:flush()
+        return true
+    elseif domain == "defaults" then
+        local filepath = DataStorage:getDataDir() .. "/defaults.custom.lua"
+        local settings_obj = LuaSettings:open(filepath)
+        if #parts == 1 then
+            settings_obj:saveSetting(parts[1], value)
+        else
+            local top_key = parts[1]
+            local top_val = settings_obj:readSetting(top_key)
+            if type(top_val) ~= "table" then
+                top_val = {}
+            end
+            local new_tbl = util.tableDeepCopy(top_val)
+            local current = new_tbl
+            for i = 2, #parts - 1 do
+                local part = parts[i]
+                if type(current[part]) ~= "table" then
+                    current[part] = {}
+                end
+                current = current[part]
+            end
+            current[parts[#parts]] = value
+            settings_obj:saveSetting(top_key, new_tbl)
+        end
+        settings_obj:flush()
+        return true
+    elseif domain:match("^settings/") then
+        local settings_name = domain:sub(10)
+        local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
+        local settings_obj = LuaSettings:open(filepath)
+        if #parts == 1 then
+            settings_obj:saveSetting(parts[1], value)
+        else
+            local top_key = parts[1]
+            local top_val = settings_obj:readSetting(top_key)
+            if type(top_val) ~= "table" then
+                top_val = {}
+            end
+            local new_tbl = util.tableDeepCopy(top_val)
+            local current = new_tbl
+            for i = 2, #parts - 1 do
+                local part = parts[i]
+                if type(current[part]) ~= "table" then
+                    current[part] = {}
+                end
+                current = current[part]
+            end
+            current[parts[#parts]] = value
+            settings_obj:saveSetting(top_key, new_tbl)
+        end
+        settings_obj:flush()
+        return true
+    end
+    return false
+end
+
+function SyncManager:pullSettings()
+    if not NetworkMgr:isConnected() then
+        utils.show_msg(_("Network is disconnected, cannot pull settings"))
+        return
+    end
+
+    local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
+    
+    utils.show_msg(_("Fetching settings from cloud..."))
+    remote.pull_settings(self.plugin, json_path, function(success, merged_data)
+        if success and merged_data then
+            self:showDevicesMenu(merged_data)
+        else
+            utils.show_msg(_("Failed to fetch settings from cloud"))
+        end
+    end)
+end
+
+function SyncManager:showDevicesMenu(settings_map)
+    local Menu = require("ui/widget/menu")
+    local menu_items = {}
+    local devices_menu
+
+    local current_device = self:getDeviceName()
+
+    -- Sort devices alphabetically by name
+    local devices = {}
+    for dev_id, data in pairs(settings_map) do
+        if dev_id ~= current_device then
+            table.insert(devices, { id = dev_id, data = data })
+        end
+    end
+    table.sort(devices, function(a, b)
+        return a.id < b.id
+    end)
+
+    for _, dev in ipairs(devices) do
+        local timestamp = dev.data.timestamp or "unknown"
+        local text = string.format("%s (%s)", dev.id, timestamp)
+        table.insert(menu_items, {
+            text = text,
+            callback = function()
+                self:showDifferingSettingsMenu(dev.id, dev.data.settings or {}, devices_menu)
+            end
+        })
+    end
+
+    if #menu_items == 0 then
+        utils.show_msg(_("No other devices found in cloud settings."))
+        return
+    end
+
+    devices_menu = Menu:new{
+        title = _("Pull settings from cloud"),
+        item_table = menu_items,
+    }
+    UIManager:show(devices_menu)
+end
+
+function SyncManager:showDifferingSettingsMenu(device_name, remote_settings, parent_menu)
+    local Menu = require("ui/widget/menu")
+    local menu_items = {}
+    local diff_menu
+
+    -- Identify differing settings
+    local differing = {}
+    local caches = {}
+    for key, r_val in pairs(remote_settings) do
+        local l_val = self:getLocalSettingValue(key, caches)
+        if values_differ(l_val, r_val) then
+            -- Format values for display
+            local function format_val(val)
+                if val == nil then return "nil" end
+                if type(val) == "boolean" then return val and "true" or "false" end
+                if type(val) == "table" then return "{...}" end
+                return tostring(val)
+            end
+            table.insert(differing, {
+                key = key,
+                local_val_str = format_val(l_val),
+                remote_val_str = format_val(r_val),
+                remote_val = r_val,
+            })
+        end
+    end
+
+    -- Sort settings alphabetically by key
+    table.sort(differing, function(a, b)
+        return a.key < b.key
+    end)
+
+    if #differing == 0 then
+        utils.show_msg(_("No differing settings found for this device."))
+        return
+    end
+
+    -- Default all to checked
+    local checked = {}
+    for _, diff in ipairs(differing) do
+        checked[diff.key] = true
+    end
+
+    -- Action item: Import Selected Settings
+    table.insert(menu_items, {
+        text = _("Import Selected Settings"),
+        bold = true,
+        callback = function()
+            local count = 0
+            for _, diff in ipairs(differing) do
+                if checked[diff.key] then
+                    if self:writeLocalSettingValue(diff.key, diff.remote_val) then
+                        count = count + 1
+                    end
+                end
+            end
+            if count > 0 then
+                self:_flushSettings()
+                utils.show_msg(T(_("Successfully imported %1 settings."), count))
+            else
+                utils.show_msg(_("No settings imported."))
+            end
+            UIManager:close(diff_menu)
+            if parent_menu then
+                UIManager:close(parent_menu)
+            end
+        end
+    })
+
+    table.insert(menu_items, {
+        text = _("Select All"),
+        callback = function()
+            for _, diff in ipairs(differing) do
+                checked[diff.key] = true
+            end
+            diff_menu:updateItems()
+        end
+    })
+
+    table.insert(menu_items, {
+        text = _("Clear Selection"),
+        callback = function()
+            checked = {}
+            diff_menu:updateItems()
+        end,
+        separator = true
+    })
+
+    for _, diff in ipairs(differing) do
+        local setting_id = diff.key
+        local domain, full_key = setting_id:match("^([^:]+):(.*)$")
+        table.insert(menu_items, {
+            text_func = function()
+                local is_checked = checked[setting_id]
+                local prefix = is_checked and "[✓] " or "[ ] "
+                return string.format("%s[%s] %s: %s -> %s",
+                    prefix, domain or "unknown", full_key or setting_id, diff.local_val_str, diff.remote_val_str)
+            end,
+            callback = function()
+                checked[setting_id] = not checked[setting_id]
+                diff_menu:updateItems()
+            end
+        })
+    end
+
+    diff_menu = Menu:new{
+        title = T(_("Settings from %1"), device_name),
+        item_table = menu_items,
+    }
+    UIManager:show(diff_menu)
+end
+
 return SyncManager

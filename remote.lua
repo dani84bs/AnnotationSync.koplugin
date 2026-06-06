@@ -246,4 +246,98 @@ function M._normalize_progress(data)
     return data
 end
 
+function M._sync_settings_callback(widget, local_file, cached_file, income_file)
+    local local_data = utils.read_json(local_file) or {}
+    local income_data = utils.read_json(income_file) or {}
+
+    -- Merge incoming settings from other devices
+    for device_id, data in pairs(income_data) do
+        if device_id ~= widget.manager:getDeviceName() then
+            local_data[device_id] = data
+        end
+    end
+
+    util.writeToFile(json.encode(local_data), local_file, true, false, true)
+    return true, local_data
+end
+
+function M.push_settings(widget, json_path, on_complete)
+    local provider = get_sync_provider(widget)
+    if not provider then
+        UIManager:show(InfoMessage:new {
+            text = _("Cloud Storage plugin is not enabled or available."),
+            timeout = 4
+        })
+        if on_complete then
+            on_complete(false)
+        end
+        return
+    end
+
+    local server = widget.settings.sync_server
+    if server then
+        local sync_cb = function(local_file, cached_file, income_file)
+            local success, local_data = M._sync_settings_callback(widget, local_file, cached_file, income_file)
+            if on_complete then
+                on_complete(success, local_data)
+            end
+            return success
+        end
+
+        if widget.ui.cloudstorage then
+            widget.ui.cloudstorage:sync(server, json_path, sync_cb, false) -- is_silent = false
+        else
+            SyncService.sync(server, json_path, sync_cb, false) -- is_silent = false
+        end
+    else
+        UIManager:show(InfoMessage:new {
+            text = T(_("No cloud destination set in settings.")),
+            timeout = 4
+        })
+        if on_complete then
+            on_complete(false)
+        end
+    end
+end
+
+function M.pull_settings(widget, json_path, on_complete)
+    local provider = get_sync_provider(widget)
+    if not provider then
+        UIManager:show(InfoMessage:new {
+            text = _("Cloud Storage plugin is not enabled or available."),
+            timeout = 4
+        })
+        if on_complete then
+            on_complete(false)
+        end
+        return
+    end
+
+    local server = widget.settings.sync_server
+    if server then
+        local sync_cb = function(local_file, cached_file, income_file)
+            local success, local_data = M._sync_settings_callback(widget, local_file, cached_file, income_file)
+            if on_complete then
+                on_complete(success, local_data)
+            end
+            return success
+        end
+
+        if widget.ui.cloudstorage then
+            widget.ui.cloudstorage:sync(server, json_path, sync_cb, false) -- is_silent = false
+        else
+            SyncService.sync(server, json_path, sync_cb, false) -- is_silent = false
+        end
+    else
+        UIManager:show(InfoMessage:new {
+            text = T(_("No cloud destination set in settings.")),
+            timeout = 4
+        })
+        if on_complete then
+            on_complete(false)
+        end
+    end
+end
+
 return M
+
