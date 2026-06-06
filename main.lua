@@ -651,7 +651,7 @@ function AnnotationSyncPlugin:showChangedSettings()
         ["reader:input_invert_left_page_turn_keys"] = true,
         ["reader:input_invert_right_page_turn_keys"] = true,
         ["reader:timezone"] = true,
-        ["reader:annotation_sync_plugin.last_sync"] = true,
+        ["reader:annotation_sync_plugin"] = true,
         ["reader:sdl_window"] = true,
 
         -- Expanded Font and Path settings exclusions:
