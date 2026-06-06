@@ -963,9 +963,19 @@ function AnnotationSyncPlugin:showChangedSettings()
 
         for _, child in ipairs(node.children) do
             if child.type == "branch" then
-                local text = string.format("[%s] %s >", child.domain, child.full_key)
                 table.insert(menu_items, {
-                    text = text,
+                    text_func = function()
+                        local keys = get_all_leaf_keys(child)
+                        local any_selected = false
+                        for _, key in ipairs(keys) do
+                            if self.settings.selected_settings and self.settings.selected_settings[key] then
+                                any_selected = true
+                                break
+                            end
+                        end
+                        local prefix = any_selected and "[✓] " or "[ ] "
+                        return string.format("%s[%s] %s >", prefix, child.domain, child.full_key)
+                    end,
                     callback = function()
                         show_node_menu(child, child.full_key)
                     end

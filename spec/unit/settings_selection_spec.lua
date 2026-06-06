@@ -138,4 +138,48 @@ describe("AnnotationSync Settings Selection", function()
 
         UIManager.show = old_show
     end)
+
+    it("should reflect nested setting selection on the parent branch node", function()
+        -- 1. Create a mock active reader settings file with changes in a nested table
+        local active_reader = {
+            ["footer"] = {
+                ["time"] = true, -- changed from default
+            }
+        }
+        local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
+        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:close()
+
+        local submenu
+        local old_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Changed Settings" then
+                submenu = widget
+            end
+            return old_show(this, widget)
+        end
+
+        sync_instance:showChangedSettings()
+        assert.is_not_nil(submenu)
+
+        -- Find the parent branch (footer) item
+        local footer_item
+        for _, item in ipairs(submenu.item_table) do
+            if item.text_func and item.text_func():find("footer >") then
+                footer_item = item
+                break
+            end
+        end
+        assert.is_not_nil(footer_item)
+        -- Initially it should be unchecked
+        assert.is_not_nil(footer_item.text_func():find("^%[ %]"))
+
+        -- Select the nested setting
+        sync_instance.settings.selected_settings["reader:footer.time"] = true
+        
+        -- Now it should be checked
+        assert.is_not_nil(footer_item.text_func():find("[✓]", 1, true))
+
+        UIManager.show = old_show
+    end)
 end)
