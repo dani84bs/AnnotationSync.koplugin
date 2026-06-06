@@ -592,4 +592,116 @@ function SyncManager:_serialize_table(tbl)
     return result
 end
 
+function SyncManager:getSelectedSettingsWithValues()
+    local selected = self.plugin.settings.selected_settings or {}
+    local has_any = false
+    for _, _ in pairs(selected) do
+        has_any = true
+        break
+    end
+    if not has_any then
+        return nil
+    end
+
+    -- Load active reader settings
+    local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
+    local ok_a, active_reader = pcall(dofile, active_reader_path)
+    if not ok_a or type(active_reader) ~= "table" then
+        active_reader = {}
+    end
+
+    -- Load active defaults settings
+    local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
+    local ok_ad, active_defaults = pcall(dofile, active_defaults_path)
+    if not ok_ad or type(active_defaults) ~= "table" then
+        active_defaults = {}
+    end
+
+    -- Cache for loaded settings files in settings/ directory
+    local settings_cache = {}
+
+    local function get_nested_value(tbl, path_str)
+        if not tbl then return nil end
+        local parts = {}
+        for part in string.gmatch(path_str, "([^%.]+)") do
+            table.insert(parts, part)
+        end
+        local current = tbl
+        for _, part in ipairs(parts) do
+            if type(current) ~= "table" then
+                return nil
+            end
+            current = current[part]
+        end
+        return current
+    end
+
+    local result = {}
+    for key, is_selected in pairs(selected) do
+        if is_selected then
+            local domain, full_key = key:match("^([^:]+):(.*)$")
+            if domain and full_key then
+                local val
+                if domain == "reader" then
+                    val = get_nested_value(active_reader, full_key)
+                elseif domain == "defaults" then
+                    val = get_nested_value(active_defaults, full_key)
+                elseif domain:match("^settings/") then
+                    local settings_name = domain:sub(10)
+                    if settings_cache[settings_name] == nil then
+                        local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
+                        local ok_s, a_tbl = pcall(dofile, filepath)
+                        if ok_s and type(a_tbl) == "table" then
+                            settings_cache[settings_name] = a_tbl
+                        else
+                            settings_cache[settings_name] = false
+                        end
+                    end
+                    local tbl = settings_cache[settings_name]
+                    if tbl then
+                        val = get_nested_value(tbl, full_key)
+                    end
+                end
+                result[key] = val
+            end
+        end
+    end
+
+    return result
+end
+
+function SyncManager:pushSettings()
+    local selected_values = self:getSelectedSettingsWithValues()
+    if not selected_values then
+        utils.show_msg(_("No settings are selected. Please select settings to sync in 'Show changed settings'."))
+        return
+    end
+
+    local device_id = self:getDeviceName()
+    local local_data = {
+        [device_id] = {
+            settings = selected_values,
+            timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+        }
+    }
+
+    local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
+    local ok, err = util.writeToFile(json.encode(local_data), json_path, true, false, true)
+    if not ok then
+        logger.warn("AnnotationSync: failed to write settings JSON: " .. json_path .. " (" .. tostring(err) .. ")")
+        utils.show_msg(_("Failed to write settings to local storage."))
+        return
+    end
+
+    logger.dbg("AnnotationSync: pushing settings to remote: " .. json_path)
+    utils.show_msg(_("Pushing settings to cloud..."))
+    remote.push_settings(self.plugin, json_path, function(success)
+        if success then
+            logger.dbg("AnnotationSync: settings push successful")
+        else
+            logger.warn("AnnotationSync: settings push failed")
+        end
+    end)
+end
+
 return SyncManager

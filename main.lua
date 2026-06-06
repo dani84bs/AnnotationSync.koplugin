@@ -284,6 +284,13 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end
             },
             {
+                text = _("Push settings to cloud"),
+                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                callback = function()
+                    self.manager:pushSettings()
+                end
+            },
+            {
                 text = _("Jump to device progress"),
                 enabled_func = function()
                     return self.ui.cloudstorage ~= nil
@@ -401,6 +408,11 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     return true
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncPushSettings()
+    self.manager:pushSettings()
+    return true
+end
+
 function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
     if not self.ui.cloudstorage then
         utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
@@ -453,6 +465,14 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         text = _(manual_sync_description),
         separator = true,
         reader = true
+    })
+    Dispatcher:registerAction("annotation_sync_push_settings", {
+        category = "none",
+        event = "AnnotationSyncPushSettings",
+        title = _("AnnotationSync: Push settings to cloud"),
+        text = _("Push the selected settings to the cloud."),
+        separator = true,
+        general = true
     })
     Dispatcher:registerAction("annotation_sync_jump_to_device_progress", {
         category = "none",
