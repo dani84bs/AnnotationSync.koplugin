@@ -32,6 +32,7 @@ function SettingsSelection.show(plugin)
         ["reader:input_invert_right_page_turn_keys"] = true,
         ["reader:timezone"] = true,
         ["reader:annotation_sync_plugin"] = true,
+        ["reader:AnnotationSync"] = true,
         ["reader:sdl_window"] = true,
 
         -- Expanded Font and Path settings exclusions:

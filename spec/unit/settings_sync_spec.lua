@@ -136,4 +136,90 @@ return {
         assert.is_not_nil(data["OtherDevice"])
         assert.is_equal(15, data["OtherDevice"].settings["reader:auto_standby_timeout_seconds"])
     end)
+
+    it("should correctly sync and pull settings from cloud, showing other devices and importing selection", function()
+        -- Configure mock sync server
+        local test_server = { url = "http://test-server-settings-pull", type = "webdav" }
+        sync_instance:onSyncServiceConfirm(test_server)
+
+        -- Mock active reader settings on local device
+        local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
+        f:write([[
+return {
+    ["auto_suspend_timeout_seconds"] = 300,
+    ["auto_standby_timeout_seconds"] = 100
+}
+]])
+        f:close()
+
+        -- Mock SyncService to simulate pulling other devices' settings
+        local sync_called = false
+        local SyncService = require("apps/cloudstorage/syncservice")
+        local old_sync = SyncService.sync
+        SyncService.sync = function(server, local_path, callback, is_silent)
+            sync_called = true
+            local income_path = local_path .. ".income"
+            -- Simulation: OtherDevice has differing auto_standby_timeout_seconds (50 instead of 100)
+            local remote_data = {
+                ["OtherDevice"] = {
+                    settings = {
+                        ["reader:auto_standby_timeout_seconds"] = 50,
+                        ["reader:auto_suspend_timeout_seconds"] = 300 -- same, so should not show
+                    },
+                    timestamp = "2026-06-06 13:00:00"
+                }
+            }
+            local fi = io.open(income_path, "w")
+            fi:write(json.encode(remote_data))
+            fi:close()
+
+            local success, merged = callback(local_path, local_path .. ".last_sync", income_path)
+            assert.is_true(success)
+
+            os.remove(income_path)
+            return true
+        end
+
+        -- Mock UIManager:show to capture the menu and trigger selection/import
+        local show_called_count = 0
+        local old_show = UIManager.show
+        UIManager.show = function(self, widget)
+            if widget.text and not widget.title then
+                return
+            end
+            show_called_count = show_called_count + 1
+            if show_called_count == 1 then
+                -- Device list menu. Let's select "OtherDevice (2026-06-06 13:00:00)"
+                assert.is_equal("Pull settings from cloud", widget.title)
+                assert.is_equal(1, #widget.item_table)
+                assert.is_not_nil(widget.item_table[1].text:find("OtherDevice"))
+                -- Trigger callback to open differing settings menu
+                widget.item_table[1].callback()
+            elseif show_called_count == 2 then
+                -- Differing settings menu.
+                assert.is_not_nil(widget.title:find("OtherDevice"))
+                -- Items should be: "Import Selected Settings", "Select All", "Clear Selection", and then the setting item
+                assert.is_equal(4, #widget.item_table)
+                assert.is_not_nil(widget.item_table[4].text_func():find("auto_standby_timeout_seconds", 1, true))
+                assert.is_not_nil(widget.item_table[4].text_func():find("100 -> 50", 1, true))
+                
+                -- Trigger "Import Selected Settings"
+                widget.item_table[1].callback()
+            end
+        end
+
+        sync_instance.manager:pullSettings()
+        assert.is_true(sync_called)
+        assert.is_equal(2, show_called_count)
+
+        -- Restore mocks
+        SyncService.sync = old_sync
+        UIManager.show = old_show
+
+        -- Verify that the setting was imported and saved locally
+        local ok_read, data = pcall(dofile, test_data_dir .. "/settings.reader.lua")
+        assert.is_true(ok_read)
+        assert.is_equal(50, data.auto_standby_timeout_seconds)
+    end)
 end)
+

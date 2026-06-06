@@ -182,4 +182,41 @@ describe("AnnotationSync Settings Selection", function()
 
         UIManager.show = old_show
     end)
+
+    it("should exclude AnnotationSync's own settings from the changed settings list", function()
+        -- 1. Create a mock active reader settings file with changes in AnnotationSync key
+        local active_reader = {
+            ["AnnotationSync"] = {
+                ["device_name"] = "MyCustomDeviceName",
+                ["selected_settings"] = { ["reader:auto_standby_timeout_seconds"] = true }
+            }
+        }
+        local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
+        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:close()
+
+        local submenu
+        local old_show = UIManager.show
+        UIManager.show = function(this, widget)
+            if widget.title == "Changed Settings" then
+                submenu = widget
+            end
+            return old_show(this, widget)
+        end
+
+        sync_instance:showChangedSettings()
+        assert.is_not_nil(submenu)
+
+        -- Verify that AnnotationSync is NOT in the submenu item list
+        for _, item in ipairs(submenu.item_table) do
+            if item.setting_id then
+                assert.is_nil(item.setting_id:find("AnnotationSync", 1, true))
+            end
+            if item.text_func then
+                assert.is_nil(item.text_func():find("AnnotationSync", 1, true))
+            end
+        end
+
+        UIManager.show = old_show
+    end)
 end)
