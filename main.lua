@@ -44,6 +44,7 @@ AnnotationSyncPlugin.default_settings = {
     progress_sync_interval = 1,
     progress_sync_last_word = false,
     device_name = "",
+    selected_settings = {},
 }
 
 function AnnotationSyncPlugin:init()
@@ -629,6 +630,7 @@ function AnnotationSyncPlugin:onAnnotationsModified(annotations)
 end
 
 function AnnotationSyncPlugin:showChangedSettings()
+    self.settings.selected_settings = self.settings.selected_settings or {}
     local root = { type = "branch", children = {} }
     local excluded = {
         -- Global reader settings (settings.reader.lua)
@@ -903,8 +905,21 @@ function AnnotationSyncPlugin:showChangedSettings()
         end
     end
 
+    local function get_all_leaf_keys(n, keys)
+        keys = keys or {}
+        for _, child in ipairs(n.children) do
+            if child.type == "branch" then
+                get_all_leaf_keys(child, keys)
+            else
+                table.insert(keys, child.domain .. ":" .. child.full_key)
+            end
+        end
+        return keys
+    end
+
     local function show_node_menu(node, title)
         local menu_items = {}
+        local submenu
         
         table.sort(node.children, function(a, b)
             if a.type ~= b.type then
@@ -912,6 +927,39 @@ function AnnotationSyncPlugin:showChangedSettings()
             end
             return a.key < b.key
         end)
+
+        if #node.children > 0 then
+            table.insert(menu_items, {
+                text = _("Select All"),
+                callback = function()
+                    local keys = get_all_leaf_keys(node)
+                    self.settings.selected_settings = self.settings.selected_settings or {}
+                    for _, key in ipairs(keys) do
+                        self.settings.selected_settings[key] = true
+                    end
+                    self:saveSettings()
+                    if submenu then
+                        submenu:updateItems()
+                    end
+                end
+            })
+            table.insert(menu_items, {
+                text = _("Clear Selection"),
+                callback = function()
+                    local keys = get_all_leaf_keys(node)
+                    if self.settings.selected_settings then
+                        for _, key in ipairs(keys) do
+                            self.settings.selected_settings[key] = nil
+                        end
+                    end
+                    self:saveSettings()
+                    if submenu then
+                        submenu:updateItems()
+                    end
+                end,
+                separator = true,
+            })
+        end
 
         for _, child in ipairs(node.children) do
             if child.type == "branch" then
@@ -923,11 +971,30 @@ function AnnotationSyncPlugin:showChangedSettings()
                     end
                 })
             else
-                local text = string.format("[%s] %s: %s -> %s", 
-                    child.domain, child.full_key, child.vanilla, child.active)
+                local setting_id = child.domain .. ":" .. child.full_key
                 table.insert(menu_items, {
-                    text = text,
-                    callback = function() end
+                    text_func = function()
+                        local is_selected = self.settings.selected_settings and self.settings.selected_settings[setting_id]
+                        local prefix = is_selected and "[✓] " or "[ ] "
+                        return string.format("%s[%s] %s: %s -> %s", 
+                            prefix, child.domain, child.full_key, child.vanilla, child.active)
+                    end,
+                    callback = function()
+                        self.settings.selected_settings = self.settings.selected_settings or {}
+                        self.settings.selected_settings[setting_id] = not self.settings.selected_settings[setting_id] or nil
+                        self:saveSettings()
+                        if submenu then
+                            local idx = 1
+                            for i, item in ipairs(menu_items) do
+                                if item.setting_id == setting_id then
+                                    idx = i
+                                    break
+                                end
+                            end
+                            submenu:updateItems(idx, true)
+                        end
+                    end,
+                    setting_id = setting_id,
                 })
             end
         end
@@ -940,7 +1007,7 @@ function AnnotationSyncPlugin:showChangedSettings()
         end
 
         local Menu = require("ui/widget/menu")
-        local submenu = Menu:new{
+        submenu = Menu:new{
             title = title,
             item_table = menu_items,
         }
