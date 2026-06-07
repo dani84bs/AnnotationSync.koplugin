@@ -25,10 +25,8 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
     if income_map then
         -- Validate it's an annotation map (heuristic: values must be tables)
         -- AND for non-empty maps, at least one entry must have annotation-like keys.
-        local has_data = false
         local is_valid_schema = true
         for k, v in pairs(income_map) do
-            has_data = true
             if type(v) ~= "table" then
                 logger.warn("AnnotationSync: income_map contains non-table value for key " .. tostring(k) .. ". Aborting.")
                 is_valid_schema = false

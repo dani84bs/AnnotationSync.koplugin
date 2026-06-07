@@ -85,7 +85,7 @@ function M._sync_progress_callback(local_file, cached_file, income_file)
     return true, local_data
 end
 
-local function run_silent(widget, func, on_timeout)
+local function run_silent(func, on_timeout)
     local old_show = UIManager.show
     local new_show
     new_show = function(self, widget_item)
@@ -140,7 +140,7 @@ function M.push_progress(widget, json_path, on_complete)
             end
         end
 
-        run_silent(widget, function(restore)
+        run_silent(function(restore)
             local success = widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
                 cb_called = true
                 local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
@@ -181,7 +181,7 @@ function M.push_progress_bg(widget, json_path, on_complete)
         Trapper:wrap(function()
             local completed, success = Trapper:dismissableRunInSubprocess(function()
                 local sync_success = false
-                run_silent(widget, function(restore)
+                run_silent(function(restore)
                     local res = widget.ui.cloudstorage:sync(server, json_path, function(local_file, cached_file, income_file)
                         sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
                         UIManager:nextTick(restore)
