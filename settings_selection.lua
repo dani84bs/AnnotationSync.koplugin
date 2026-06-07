@@ -205,39 +205,27 @@ function SettingsSelection.show(plugin)
         end
     end
 
+    local function compare_settings_file(domain, vanilla_path, active_path, parent_node)
+        local ok_v, vanilla_tbl = pcall(dofile, vanilla_path)
+        local ok_a, active_tbl = pcall(dofile, active_path)
+
+        local all_keys = {}
+        if ok_v and type(vanilla_tbl) == "table" then
+            for k in pairs(vanilla_tbl) do all_keys[k] = true end
+        end
+        if ok_a and type(active_tbl) == "table" then
+            for k in pairs(active_tbl) do all_keys[k] = true end
+        end
+        for k in pairs(all_keys) do
+            build_diff_tree(domain, ok_v and vanilla_tbl and vanilla_tbl[k], ok_a and active_tbl and active_tbl[k], {k}, parent_node)
+        end
+    end
+
     -- 1. Compare settings.reader.lua
-    local vanilla_reader_path = plugin.path .. "/defaults/settings.reader.lua"
-    local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
-    local ok_v, vanilla_reader = pcall(dofile, vanilla_reader_path)
-    local ok_a, active_reader = pcall(dofile, active_reader_path)
-    
-    local all_keys_reader = {}
-    if ok_v and type(vanilla_reader) == "table" then
-        for k in pairs(vanilla_reader) do all_keys_reader[k] = true end
-    end
-    if ok_a and type(active_reader) == "table" then
-        for k in pairs(active_reader) do all_keys_reader[k] = true end
-    end
-    for k in pairs(all_keys_reader) do
-        build_diff_tree("reader", ok_v and vanilla_reader and vanilla_reader[k], ok_a and active_reader and active_reader[k], {k}, root)
-    end
+    compare_settings_file("reader", plugin.path .. "/defaults/settings.reader.lua", DataStorage:getDataDir() .. "/settings.reader.lua", root)
 
     -- 2. Compare defaults.custom.lua
-    local vanilla_defaults_path = plugin.path .. "/defaults/defaults.custom.lua"
-    local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
-    local ok_vd, vanilla_defaults = pcall(dofile, vanilla_defaults_path)
-    local ok_ad, active_defaults = pcall(dofile, active_defaults_path)
-
-    local all_keys_defaults = {}
-    if ok_vd and type(vanilla_defaults) == "table" then
-        for k in pairs(vanilla_defaults) do all_keys_defaults[k] = true end
-    end
-    if ok_ad and type(active_defaults) == "table" then
-        for k in pairs(active_defaults) do all_keys_defaults[k] = true end
-    end
-    for k in pairs(all_keys_defaults) do
-        build_diff_tree("defaults", ok_vd and vanilla_defaults and vanilla_defaults[k], ok_ad and active_defaults and active_defaults[k], {k}, root)
-    end
+    compare_settings_file("defaults", plugin.path .. "/defaults/defaults.custom.lua", DataStorage:getDataDir() .. "/defaults.custom.lua", root)
 
     -- 3. Compare files in settings/ directory
     local vanilla_settings_dir = plugin.path .. "/defaults/settings"
@@ -252,17 +240,6 @@ function SettingsSelection.show(plugin)
                     local name = entry:gsub("%.lua$", "")
                     local domain = "settings/" .. name
                     if not excluded[domain] then
-                        local ok_vs, v_tbl = pcall(dofile, filepath)
-                        local ok_as, a_tbl = pcall(dofile, active_settings_dir .. "/" .. entry)
-                        
-                        local all_keys_settings = {}
-                        if ok_vs and type(v_tbl) == "table" then
-                            for k in pairs(v_tbl) do all_keys_settings[k] = true end
-                        end
-                        if ok_as and type(a_tbl) == "table" then
-                            for k in pairs(a_tbl) do all_keys_settings[k] = true end
-                        end
-                        
                         local file_branch = {
                             type = "branch",
                             domain = domain,
@@ -271,9 +248,7 @@ function SettingsSelection.show(plugin)
                             children = {}
                         }
                         
-                        for k in pairs(all_keys_settings) do
-                            build_diff_tree(domain, ok_vs and v_tbl and v_tbl[k], ok_as and a_tbl and a_tbl[k], {k}, file_branch)
-                        end
+                        compare_settings_file(domain, filepath, active_settings_dir .. "/" .. entry, file_branch)
                         
                         if #file_branch.children > 0 then
                             table.insert(root.children, file_branch)
