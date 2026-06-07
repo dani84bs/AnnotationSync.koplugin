@@ -4,7 +4,6 @@ local Event = require("ui/event")
 local Dispatcher = require("dispatcher")
 local DocumentRegistry = require("document/documentregistry")
 local InfoMessage = require("ui/widget/infomessage")
-local ConfirmBox = require("ui/widget/confirmbox")
 local InputDialog = require("ui/widget/inputdialog")
 local LuaSettings = require("luasettings")
 local ReaderAnnotation = require("apps/reader/modules/readerannotation")
@@ -22,6 +21,7 @@ local remote = require("remote")
 local utils = require("utils")
 local SyncManager = require("manager")
 local SettingsSelection = require("settings_selection")
+local menus = require("menus")
 
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
@@ -556,66 +556,7 @@ end
 function AnnotationSyncPlugin:showDeletedAnnotations()
     local document = self.ui and self.ui.document
     if not document then return end
-
-    local deleted = self.manager:getDeletedAnnotations(document)
-    if #deleted == 0 then
-        utils.show_msg(_("No deleted annotations found for this document."))
-        return
-    end
-
-    local Menu = require("ui/widget/menu")
-    local deleted_menu
-    local menu_items = {}
-
-    -- Add Restore All button at the top
-    table.insert(menu_items, {
-        text = _("Restore All"),
-        bold = true,
-        callback = function()
-            UIManager:show(ConfirmBox:new{
-                text = T(_("Are you sure you want to restore all %1 deleted annotations?"), #deleted),
-                type = "yesno",
-                ok_text = _("Restore All"),
-                ok_callback = function()
-                    for _, ann in ipairs(deleted) do
-                        self:restoreAnnotation(ann, true) -- true = silent
-                    end
-                    utils.show_msg(T(_("Restored %1 annotations."), #deleted))
-                    if deleted_menu then UIManager:close(deleted_menu) end
-                end
-            })
-        end,
-        separator = true,
-    })
-
-    for i, ann in ipairs(deleted) do
-        local text = ann.text or ann.notes or _("Highlight")
-        if text == "" then text = _("Highlight") end
-        -- Truncate long text
-        if #text > 50 then text = text:sub(1, 47) .. "..." end
-        
-        table.insert(menu_items, {
-            text = text,
-            callback = function()
-                UIManager:show(ConfirmBox:new{
-                    text = T(_("Do you want to restore this annotation?\n\nPage %1: %2"), 
-                        ann.page, ann.text or ann.notes or ""),
-                    type = "yesno",
-                    ok_text = _("Restore"),
-                    cancel_text = _("Close"),
-                    ok_callback = function()
-                        self:restoreAnnotation(ann)
-                    end
-                })
-            end
-        })
-    end
-
-    deleted_menu = Menu:new{
-        title = _("Deleted Annotations"),
-        item_table = menu_items,
-    }
-    UIManager:show(deleted_menu)
+    menus.show_deleted_annotations(self, document)
 end
 
 function AnnotationSyncPlugin:restoreAnnotation(ann, silent)

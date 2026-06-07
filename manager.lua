@@ -15,6 +15,7 @@ local lfs = require("libs/libkoreader-lfs")
 local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
+local menus = require("menus")
 
 local SyncManager = {}
 
@@ -262,74 +263,11 @@ function SyncManager:pullProgress()
     utils.show_msg(_("Fetching remote progress..."))
     remote.pull_progress(self.plugin, json_path, function(success, merged_data)
         if success and merged_data then
-            self:showJumpMenu(merged_data)
+            menus.show_jump_menu(self.plugin, merged_data)
         else
             utils.show_msg(_("Failed to fetch remote progress"))
         end
     end)
-end
-
-function SyncManager:showJumpMenu(progress_map)
-    local Menu = require("ui/widget/menu")
-    local menu_items = {}
-    local jump_menu
-
-    local device_id = self:getDeviceName()
-
-    -- Sort devices by percentage descending, breaking ties alphabetically by device name
-    local devices = {}
-    for dev_id, data in pairs(progress_map) do
-        table.insert(devices, { id = dev_id, data = data })
-    end
-    table.sort(devices, function(a, b)
-        local a_pct = a.data.percentage or 0
-        local b_pct = b.data.percentage or 0
-        if a_pct ~= b_pct then
-            return a_pct > b_pct
-        end
-        return a.id < b.id
-    end)
-
-    for idx, dev in ipairs(devices) do
-        local is_current = (dev.id == device_id)
-        local percentage = (dev.data.percentage or 0) * 100
-        local text = string.format("%s: Page %d (%d%%)",
-            dev.id, dev.data.page or 0, math.floor(percentage + 0.5))
-        if is_current then
-            text = text .. " " .. _("(this device)")
-        end
-
-        table.insert(menu_items, {
-            text = text,
-            sub_text = dev.data.timestamp,
-            callback = function()
-                if dev.data.pos then
-                    if self.plugin.ui.link then
-                        self.plugin.ui.link:onGotoLink({ xpointer = dev.data.pos })
-                    else
-                        self.plugin.ui:handleEvent(Event:new("GotoPos", dev.data.pos))
-                        UIManager:broadcastEvent(Event:new("GotoPos", dev.data.pos))
-                    end
-                else
-                    self.plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
-                    UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
-                end
-                utils.show_msg(T(_("Jumped to page %1 from %2"), dev.data.page, dev.id))
-                UIManager:close(jump_menu)
-            end
-        })
-    end
-
-    if #menu_items == 0 then
-        utils.show_msg(_("No remote progress found."))
-        return
-    end
-
-    jump_menu = Menu:new{
-        title = _("Jump to device progress"),
-        item_table = menu_items,
-    }
-    UIManager:show(jump_menu)
 end
 
 -- Sync all changed documents listed in changed_documents.lua
@@ -800,164 +738,11 @@ function SyncManager:pullSettings()
     utils.show_msg(_("Fetching settings from cloud..."))
     remote.sync_settings(self.plugin, json_path, function(success, merged_data)
         if success and merged_data then
-            self:showDevicesMenu(merged_data)
+            menus.show_devices_menu(self.plugin, merged_data)
         else
             utils.show_msg(_("Failed to fetch settings from cloud"))
         end
     end)
-end
-
-function SyncManager:showDevicesMenu(settings_map)
-    local Menu = require("ui/widget/menu")
-    local menu_items = {}
-    local devices_menu
-
-    local current_device = self:getDeviceName()
-
-    -- Sort devices alphabetically by name
-    local devices = {}
-    for dev_id, data in pairs(settings_map) do
-        if dev_id ~= current_device then
-            table.insert(devices, { id = dev_id, data = data })
-        end
-    end
-    table.sort(devices, function(a, b)
-        return a.id < b.id
-    end)
-
-    for _, dev in ipairs(devices) do
-        local timestamp = dev.data.timestamp or "unknown"
-        local text = string.format("%s (%s)", dev.id, timestamp)
-        table.insert(menu_items, {
-            text = text,
-            callback = function()
-                self:showDifferingSettingsMenu(dev.id, dev.data.settings or {}, devices_menu)
-            end
-        })
-    end
-
-    if #menu_items == 0 then
-        utils.show_msg(_("No other devices found in cloud settings."))
-        return
-    end
-
-    devices_menu = Menu:new{
-        title = _("Pull settings from cloud"),
-        item_table = menu_items,
-    }
-    UIManager:show(devices_menu)
-end
-
-function SyncManager:showDifferingSettingsMenu(device_name, remote_settings, parent_menu)
-    local Menu = require("ui/widget/menu")
-    local menu_items = {}
-    local diff_menu
-
-    -- Identify differing settings
-    local differing = {}
-    local caches = {}
-    for key, r_val in pairs(remote_settings) do
-        local l_val = self:getLocalSettingValue(key, caches)
-        if values_differ(l_val, r_val) then
-            -- Format values for display
-            local function format_val(val)
-                if val == nil then return "nil" end
-                if type(val) == "boolean" then return val and "true" or "false" end
-                if type(val) == "table" then return "{...}" end
-                return tostring(val)
-            end
-            table.insert(differing, {
-                key = key,
-                local_val_str = format_val(l_val),
-                remote_val_str = format_val(r_val),
-                remote_val = r_val,
-            })
-        end
-    end
-
-    -- Sort settings alphabetically by key
-    table.sort(differing, function(a, b)
-        return a.key < b.key
-    end)
-
-    if #differing == 0 then
-        utils.show_msg(_("No differing settings found for this device."))
-        return
-    end
-
-    -- Default all to checked
-    local checked = {}
-    for _, diff in ipairs(differing) do
-        checked[diff.key] = true
-    end
-
-    -- Action item: Import Selected Settings
-    table.insert(menu_items, {
-        text = _("Import Selected Settings"),
-        bold = true,
-        callback = function()
-            local count = 0
-            for _, diff in ipairs(differing) do
-                if checked[diff.key] then
-                    if self:writeLocalSettingValue(diff.key, diff.remote_val) then
-                        count = count + 1
-                    end
-                end
-            end
-            if count > 0 then
-                self:_flushSettings()
-                utils.show_msg(T(_("Successfully imported %1 settings."), count))
-            else
-                utils.show_msg(_("No settings imported."))
-            end
-            UIManager:close(diff_menu)
-            if parent_menu then
-                UIManager:close(parent_menu)
-            end
-        end
-    })
-
-    table.insert(menu_items, {
-        text = _("Select All"),
-        callback = function()
-            for _, diff in ipairs(differing) do
-                checked[diff.key] = true
-            end
-            diff_menu:updateItems()
-        end
-    })
-
-    table.insert(menu_items, {
-        text = _("Clear Selection"),
-        callback = function()
-            checked = {}
-            diff_menu:updateItems()
-        end,
-        separator = true
-    })
-
-    for _, diff in ipairs(differing) do
-        local setting_id = diff.key
-        local domain, full_key = setting_id:match("^([^:]+):(.*)$")
-        table.insert(menu_items, {
-            text_func = function()
-                local is_checked = checked[setting_id]
-                local prefix = is_checked and "[✓] " or "[ ] "
-                return string.format("%s[%s] %s: %s -> %s",
-                    prefix, domain or "unknown", full_key or setting_id, diff.local_val_str, diff.remote_val_str)
-            end,
-            callback = function()
-                checked[setting_id] = not checked[setting_id]
-                diff_menu:updateItems()
-            end
-        })
-    end
-
-    diff_menu = Menu:new{
-        title = T(_("Settings from %1"), device_name),
-        item_table = menu_items,
-    }
-    UIManager:show(diff_menu)
 end
 
 return SyncManager
