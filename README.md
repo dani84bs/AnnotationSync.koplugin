@@ -8,9 +8,11 @@
 
 - **Cloud sync for KOReader annotations** (highlights, notes, bookmarks)
 - **Multi-device Reading Progress Sync:** Keep your active page, percentage, and precise position synchronized between all your reading devices.
+- **⚙️ Settings Synchronization:** Synchronize your KOReader configuration settings (e.g., gesture configurations, page overlap styles, custom hotkeys) across all your devices selectively via your cloud storage.
 - **Smart page alignment for reflowable documents (EPUB):** Sync progress via the page's last word rather than just page numbers to maintain reading consistency across different screen sizes, font settings, margins, or orientations.
+- **Customizable Device Name:** Assign friendly custom names to your devices (e.g., "Bedside Kobo", "Phone") to easily identify them in sync menus.
 - **Automatic background sync:** Quietly updates your progress in the background (using a dedicated background helper) as you turn pages, preventing intrusive popup messages.
-- **Core Cloud Storage Integration:** Integrates seamlessly with KOReader's native cloud storage plugin (supporting Dropbox, FTP, WebDAV, etc.).
+- **Core Cloud Storage Integration:** Integrates seamlessly with KOReader's native cloud storage plugin (supporting Dropbox, FTP, WebDAV, etc. and showing the active cloud configuration details directly in the settings menu).
 - **Backward Compatibility:** Safe fallback mode for older KOReader versions, disabling unsupported settings gracefully without breaking core annotation sync.
 - **Smart merging:** Resolves conflicts by comparing update timestamps to preserve your latest annotations.
 - **Failsafe protection:** Prevents accidental remote data loss when setting up a fresh device.
@@ -48,11 +50,49 @@ To configure multi-device reading progress synchronization:
 1. Go to **Tools** -> **Annotation Sync** -> **Settings**.
 2. Enable **Enable Reading Progress Sync**.
 3. Customize your progress sync preferences:
+   - **Device name:** Give your device a friendly name under **Device name: [Name]** (e.g. `Bedside Kobo`, `Phone`). Defaults to hardware model name if left blank.
    - **Sync using last word of page:** Recommended for reflowable formats like EPUB. Keeps tracking consistent even if font sizes or margins differ between devices.
    - **Sync every # pages:** Customize how frequently progress syncs in the background (default: 1 page turn).
 4. To jump to the progress of another device:
    - Go to **Tools** -> **Annotation Sync** -> **Jump to device progress**.
-   - Select a device from the menu (sorted by latest timestamp) to jump directly to its reading position.
+   - Select a device from the menu (sorted by progress percentage descending, with alphabetical tie-breaking by device name) to jump directly to its reading position.
+
+### ⚙️ Settings Synchronization
+
+Keep your KOReader settings (e.g., gestures, hotkeys, page overlap style) synchronized across devices.
+
+#### 1. Selecting Settings to Sync
+1. Go to **Tools** -> **Annotation Sync** -> **Settings** -> **Show changed settings**.
+2. This displays a hierarchical list of settings that differ from their default/vanilla configuration, categorized by domains (e.g., `[reader]`, `[defaults]`, `[settings/hotkeys]`).
+3. Dictionary settings open submenus, and list arrays are compared as single entities.
+4. Tap items to toggle their sync status. A checkmark `[✓]` indicates it will be synchronized:
+   ```text
+   [✓] [reader] page_overlap_style: default -> none
+   [ ] [settings/hotkeys] hotkey_map >
+   ```
+5. You can use **Select All** or **Clear Selection** at any menu level to easily batch-configure settings. Your selections are automatically saved.
+
+#### 2. Pushing Settings to the Cloud
+1. Go to **Tools** -> **Annotation Sync** -> **Push settings to cloud**.
+2. The selected settings will be uploaded, keyed by your customized device name.
+
+#### 3. Pulling Settings from the Cloud
+1. Go to **Tools** -> **Annotation Sync** -> **Pull settings from cloud**.
+2. Select the device whose settings you want to import from the list of available devices (showing their upload timestamps).
+3. The plugin will display the differences between that device's settings and your local configuration.
+4. Select which settings you want to import and select **Import Selected Settings**. The plugin will automatically update the corresponding configurations and apply them.
+
+> [!IMPORTANT]
+> **Exclusions & Failsafes**
+> To prevent settings conflicts, credentials leaks, or infinite sync loops, the following settings are strictly excluded from synchronization:
+> - **Private credentials and server configurations** (e.g., `cloud_server_object`, FTP/WebDAV passwords)
+> - **Device-specific identifiers and paths** (e.g., `device_id`, `device_name`, `lastfile`, `home_dir`, font maps, cover caches)
+> - **Core plugin settings** (e.g., `annotation_sync_plugin` and `AnnotationSync` preferences)
+> - **Database and statistics logs** (e.g., battery stats, terminal configs, book statistics)
+
+> [!WARNING]
+> **Security Warning**
+> Synced settings are stored in cleartext (unencrypted JSON format) on your configured cloud storage destination under the `settings_sync.json` file. Avoid selecting or storing highly sensitive or private information in synced settings.
 
 ### 💾 Manual & Bulk Annotation Sync
 
