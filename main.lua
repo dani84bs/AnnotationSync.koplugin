@@ -271,6 +271,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                             self:showChangedSettings()
                         end,
                     },
+                    {
+                        enabled = false,
+                        text_func = function()
+                            local server = self.settings.sync_server
+                            local cloud_desc = (server and server.url) or _("None")
+                            return T(_("Current cloud: %1"), cloud_desc)
+                        end,
+                    },
                 },
                 separator = true,
             },

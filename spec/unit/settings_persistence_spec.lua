@@ -169,4 +169,21 @@ describe("AnnotationSync Settings Persistence", function()
         -- 6. Verify the tracking file is deleted
         assert.is_nil(util.fileExists(track_path))
     end)
+
+    it("should show current cloud in the settings menu", function()
+        -- 1. Verify default displays "None"
+        local menu_items = {}
+        sync_instance:addToMainMenu(menu_items)
+        local settings_menu = menu_items.annotation_sync_plugin.sub_item_table[1]
+        local last_item = settings_menu.sub_item_table[#settings_menu.sub_item_table]
+
+        assert.is_not_nil(last_item)
+        assert.is_false(last_item.enabled)
+        assert.is_not_nil(last_item.text_func)
+        assert.is_equal("Current cloud: None", last_item.text_func())
+
+        -- 2. Mock sync_server and verify it updates dynamically
+        sync_instance.settings.sync_server = { url = "https://my-test-cloud.example.com", type = "webdav" }
+        assert.is_equal("Current cloud: https://my-test-cloud.example.com", last_item.text_func())
+    end)
 end)
