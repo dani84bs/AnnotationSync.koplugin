@@ -21,7 +21,7 @@ local function get_sync_provider(widget)
     return nil
 end
 
-function M.sync_annotations(widget, document, json_path, on_complete, force)
+local function perform_sync(widget, json_path, sync_cb, is_silent, on_complete)
     local provider = get_sync_provider(widget)
     if not provider then
         UIManager:show(InfoMessage:new {
@@ -36,18 +36,10 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
 
     local server = widget.settings.sync_server
     if server then
-        local sync_cb = function(local_file, cached_file, income_file)
-            local success, merged_list = annotations.sync_callback(document, local_file, cached_file, income_file, force)
-            if on_complete then
-                on_complete(success, merged_list)
-            end
-            return success
-        end
-
         if widget.ui.cloudstorage then
-            widget.ui.cloudstorage:sync(server, json_path, sync_cb, not force)
+            widget.ui.cloudstorage:sync(server, json_path, sync_cb, is_silent)
         else
-            SyncService.sync(server, json_path, sync_cb, not force)
+            SyncService.sync(server, json_path, sync_cb, is_silent)
         end
     else
         UIManager:show(InfoMessage:new {
@@ -58,6 +50,17 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
             on_complete(false)
         end
     end
+end
+
+function M.sync_annotations(widget, document, json_path, on_complete, force)
+    local sync_cb = function(local_file, cached_file, income_file)
+        local success, merged_list = annotations.sync_callback(document, local_file, cached_file, income_file, force)
+        if on_complete then
+            on_complete(success, merged_list)
+        end
+        return success
+    end
+    perform_sync(widget, json_path, sync_cb, not force, on_complete)
 end
 
 function M._sync_progress_callback(local_file, cached_file, income_file)
@@ -261,82 +264,15 @@ function M._sync_settings_callback(widget, local_file, cached_file, income_file)
     return true, local_data
 end
 
-function M.push_settings(widget, json_path, on_complete)
-    local provider = get_sync_provider(widget)
-    if not provider then
-        UIManager:show(InfoMessage:new {
-            text = _("Cloud Storage plugin is not enabled or available."),
-            timeout = 4
-        })
+function M.sync_settings(widget, json_path, on_complete)
+    local sync_cb = function(local_file, cached_file, income_file)
+        local success, local_data = M._sync_settings_callback(widget, local_file, cached_file, income_file)
         if on_complete then
-            on_complete(false)
+            on_complete(success, local_data)
         end
-        return
+        return success
     end
-
-    local server = widget.settings.sync_server
-    if server then
-        local sync_cb = function(local_file, cached_file, income_file)
-            local success, local_data = M._sync_settings_callback(widget, local_file, cached_file, income_file)
-            if on_complete then
-                on_complete(success, local_data)
-            end
-            return success
-        end
-
-        if widget.ui.cloudstorage then
-            widget.ui.cloudstorage:sync(server, json_path, sync_cb, false) -- is_silent = false
-        else
-            SyncService.sync(server, json_path, sync_cb, false) -- is_silent = false
-        end
-    else
-        UIManager:show(InfoMessage:new {
-            text = T(_("No cloud destination set in settings.")),
-            timeout = 4
-        })
-        if on_complete then
-            on_complete(false)
-        end
-    end
-end
-
-function M.pull_settings(widget, json_path, on_complete)
-    local provider = get_sync_provider(widget)
-    if not provider then
-        UIManager:show(InfoMessage:new {
-            text = _("Cloud Storage plugin is not enabled or available."),
-            timeout = 4
-        })
-        if on_complete then
-            on_complete(false)
-        end
-        return
-    end
-
-    local server = widget.settings.sync_server
-    if server then
-        local sync_cb = function(local_file, cached_file, income_file)
-            local success, local_data = M._sync_settings_callback(widget, local_file, cached_file, income_file)
-            if on_complete then
-                on_complete(success, local_data)
-            end
-            return success
-        end
-
-        if widget.ui.cloudstorage then
-            widget.ui.cloudstorage:sync(server, json_path, sync_cb, false) -- is_silent = false
-        else
-            SyncService.sync(server, json_path, sync_cb, false) -- is_silent = false
-        end
-    else
-        UIManager:show(InfoMessage:new {
-            text = T(_("No cloud destination set in settings.")),
-            timeout = 4
-        })
-        if on_complete then
-            on_complete(false)
-        end
-    end
+    perform_sync(widget, json_path, sync_cb, false, on_complete)
 end
 
 return M

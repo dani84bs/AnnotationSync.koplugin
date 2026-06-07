@@ -679,7 +679,7 @@ function SyncManager:pushSettings()
 
     logger.dbg("AnnotationSync: pushing settings to remote: " .. json_path)
     utils.show_msg(_("Pushing settings to cloud..."))
-    remote.push_settings(self.plugin, json_path, function(success)
+    remote.sync_settings(self.plugin, json_path, function(success)
         if success then
             logger.dbg("AnnotationSync: settings push successful")
         else
@@ -798,7 +798,7 @@ function SyncManager:pullSettings()
     local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
     
     utils.show_msg(_("Fetching settings from cloud..."))
-    remote.pull_settings(self.plugin, json_path, function(success, merged_data)
+    remote.sync_settings(self.plugin, json_path, function(success, merged_data)
         if success and merged_data then
             self:showDevicesMenu(merged_data)
         else
