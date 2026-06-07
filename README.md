@@ -8,7 +8,7 @@
 
 - **Cloud sync for KOReader annotations** (highlights, notes, bookmarks)
 - **Multi-device Reading Progress Sync:** Keep your active page, percentage, and precise position synchronized between all your reading devices.
-- **⚙️ Settings Synchronization:** Synchronize your KOReader configuration settings (e.g., gesture configurations, page overlap styles, custom hotkeys) across all your devices selectively via your cloud storage.
+- **Settings Synchronization:** Synchronize your KOReader configuration settings (e.g., gesture configurations, page overlap styles, custom hotkeys) across all your devices selectively via your cloud storage.
 - **Smart page alignment for reflowable documents (EPUB):** Sync progress via the page's last word rather than just page numbers to maintain reading consistency across different screen sizes, font settings, margins, or orientations.
 - **Customizable Device Name:** Assign friendly custom names to your devices (e.g., "Bedside Kobo", "Phone") to easily identify them in sync menus.
 - **Automatic background sync:** Quietly updates your progress in the background (using a dedicated background helper) as you turn pages, preventing intrusive popup messages.
