@@ -54,4 +54,20 @@ function M.show_msg(msg)
     })
 end
 
+function M.get_nested_value(tbl, path_str)
+    if not tbl then return nil end
+    local parts = {}
+    for part in string.gmatch(path_str, "([^%.]+)") do
+        table.insert(parts, part)
+    end
+    local current = tbl
+    for _, part in ipairs(parts) do
+        if type(current) ~= "table" then
+            return nil
+        end
+        current = current[part]
+    end
+    return current
+end
+
 return M

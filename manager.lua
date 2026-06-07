@@ -620,22 +620,6 @@ function SyncManager:getSelectedSettingsWithValues()
     -- Cache for loaded settings files in settings/ directory
     local settings_cache = {}
 
-    local function get_nested_value(tbl, path_str)
-        if not tbl then return nil end
-        local parts = {}
-        for part in string.gmatch(path_str, "([^%.]+)") do
-            table.insert(parts, part)
-        end
-        local current = tbl
-        for _, part in ipairs(parts) do
-            if type(current) ~= "table" then
-                return nil
-            end
-            current = current[part]
-        end
-        return current
-    end
-
     local result = {}
     for key, is_selected in pairs(selected) do
         if is_selected then
@@ -643,9 +627,9 @@ function SyncManager:getSelectedSettingsWithValues()
             if domain and full_key then
                 local val
                 if domain == "reader" then
-                    val = get_nested_value(active_reader, full_key)
+                    val = utils.get_nested_value(active_reader, full_key)
                 elseif domain == "defaults" then
-                    val = get_nested_value(active_defaults, full_key)
+                    val = utils.get_nested_value(active_defaults, full_key)
                 elseif domain:match("^settings/") then
                     local settings_name = domain:sub(10)
                     if settings_cache[settings_name] == nil then
@@ -659,7 +643,7 @@ function SyncManager:getSelectedSettingsWithValues()
                     end
                     local tbl = settings_cache[settings_name]
                     if tbl then
-                        val = get_nested_value(tbl, full_key)
+                        val = utils.get_nested_value(tbl, full_key)
                     end
                 end
                 result[key] = val
@@ -719,36 +703,20 @@ function SyncManager:getLocalSettingValue(key, caches)
     local domain, full_key = key:match("^([^:]+):(.*)$")
     if not domain or not full_key then return nil end
 
-    local function get_nested_value(tbl, path_str)
-        if not tbl then return nil end
-        local parts = {}
-        for part in string.gmatch(path_str, "([^%.]+)") do
-            table.insert(parts, part)
-        end
-        local current = tbl
-        for _, part in ipairs(parts) do
-            if type(current) ~= "table" then
-                return nil
-            end
-            current = current[part]
-        end
-        return current
-    end
-
     if domain == "reader" then
         if caches.reader == nil then
             local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
             local ok, active_reader = pcall(dofile, active_reader_path)
             caches.reader = ok and active_reader or {}
         end
-        return get_nested_value(caches.reader, full_key)
+        return utils.get_nested_value(caches.reader, full_key)
     elseif domain == "defaults" then
         if caches.defaults == nil then
             local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
             local ok, active_defaults = pcall(dofile, active_defaults_path)
             caches.defaults = ok and active_defaults or {}
         end
-        return get_nested_value(caches.defaults, full_key)
+        return utils.get_nested_value(caches.defaults, full_key)
     elseif domain:match("^settings/") then
         local settings_name = domain:sub(10)
         if caches[settings_name] == nil then
@@ -758,10 +726,34 @@ function SyncManager:getLocalSettingValue(key, caches)
         end
         local tbl = caches[settings_name]
         if tbl then
-            return get_nested_value(tbl, full_key)
+            return utils.get_nested_value(tbl, full_key)
         end
     end
     return nil
+end
+
+local function save_nested_setting(settings_obj, parts, value)
+    if #parts == 1 then
+        settings_obj:saveSetting(parts[1], value)
+    else
+        local top_key = parts[1]
+        local top_val = settings_obj:readSetting(top_key)
+        if type(top_val) ~= "table" then
+            top_val = {}
+        end
+        local new_tbl = util.tableDeepCopy(top_val)
+        local current = new_tbl
+        for i = 2, #parts - 1 do
+            local part = parts[i]
+            if type(current[part]) ~= "table" then
+                current[part] = {}
+            end
+            current = current[part]
+        end
+        current[parts[#parts]] = value
+        settings_obj:saveSetting(top_key, new_tbl)
+    end
+    settings_obj:flush()
 end
 
 function SyncManager:writeLocalSettingValue(key, value)
@@ -775,106 +767,27 @@ function SyncManager:writeLocalSettingValue(key, value)
     end
 
     if domain == "reader" then
-        if #parts == 1 then
-            G_reader_settings:saveSetting(parts[1], value)
-        else
-            local top_key = parts[1]
-            local top_val = G_reader_settings:readSetting(top_key)
-            if type(top_val) ~= "table" then
-                top_val = {}
-            end
-            local new_tbl = util.tableDeepCopy(top_val)
-            local current = new_tbl
-            for i = 2, #parts - 1 do
-                local part = parts[i]
-                if type(current[part]) ~= "table" then
-                    current[part] = {}
-                end
-                current = current[part]
-            end
-            current[parts[#parts]] = value
-            G_reader_settings:saveSetting(top_key, new_tbl)
-        end
-        G_reader_settings:flush()
+        save_nested_setting(G_reader_settings, parts, value)
 
         local filepath = DataStorage:getDataDir() .. "/settings.reader.lua"
         local settings_obj = LuaSettings:open(filepath)
-        if #parts == 1 then
-            settings_obj:saveSetting(parts[1], value)
-        else
-            local top_key = parts[1]
-            local top_val = settings_obj:readSetting(top_key)
-            if type(top_val) ~= "table" then
-                top_val = {}
-            end
-            local new_tbl = util.tableDeepCopy(top_val)
-            local current = new_tbl
-            for i = 2, #parts - 1 do
-                local part = parts[i]
-                if type(current[part]) ~= "table" then
-                    current[part] = {}
-                end
-                current = current[part]
-            end
-            current[parts[#parts]] = value
-            settings_obj:saveSetting(top_key, new_tbl)
-        end
-        settings_obj:flush()
+        save_nested_setting(settings_obj, parts, value)
         return true
     elseif domain == "defaults" then
         local filepath = DataStorage:getDataDir() .. "/defaults.custom.lua"
         local settings_obj = LuaSettings:open(filepath)
-        if #parts == 1 then
-            settings_obj:saveSetting(parts[1], value)
-        else
-            local top_key = parts[1]
-            local top_val = settings_obj:readSetting(top_key)
-            if type(top_val) ~= "table" then
-                top_val = {}
-            end
-            local new_tbl = util.tableDeepCopy(top_val)
-            local current = new_tbl
-            for i = 2, #parts - 1 do
-                local part = parts[i]
-                if type(current[part]) ~= "table" then
-                    current[part] = {}
-                end
-                current = current[part]
-            end
-            current[parts[#parts]] = value
-            settings_obj:saveSetting(top_key, new_tbl)
-        end
-        settings_obj:flush()
+        save_nested_setting(settings_obj, parts, value)
         return true
     elseif domain:match("^settings/") then
         local settings_name = domain:sub(10)
         local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
         local settings_obj = LuaSettings:open(filepath)
-        if #parts == 1 then
-            settings_obj:saveSetting(parts[1], value)
-        else
-            local top_key = parts[1]
-            local top_val = settings_obj:readSetting(top_key)
-            if type(top_val) ~= "table" then
-                top_val = {}
-            end
-            local new_tbl = util.tableDeepCopy(top_val)
-            local current = new_tbl
-            for i = 2, #parts - 1 do
-                local part = parts[i]
-                if type(current[part]) ~= "table" then
-                    current[part] = {}
-                end
-                current = current[part]
-            end
-            current[parts[#parts]] = value
-            settings_obj:saveSetting(top_key, new_tbl)
-        end
-        settings_obj:flush()
+        save_nested_setting(settings_obj, parts, value)
         return true
     end
     return false
 end
+
 
 function SyncManager:pullSettings()
     if not NetworkMgr:isConnected() then
