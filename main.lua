@@ -325,6 +325,13 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 separator = true,
             },
             {
+                text = _("Show pending/unsynced documents"),
+                enabled = true,
+                callback = function()
+                    menus.show_pending_documents(self)
+                end,
+            },
+            {
                 text = _("Show Deleted"),
                 enabled = ((self.ui and self.ui.document) ~= nil),
                 callback = function()

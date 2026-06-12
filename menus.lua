@@ -296,4 +296,81 @@ function M.show_differing_settings_menu(plugin, device_name, remote_settings, pa
     UIManager:show(diff_menu)
 end
 
+function M.show_pending_documents(plugin)
+    local total, changed_docs = plugin.manager:getPendingChangedDocuments()
+    if total == 0 then
+        utils.show_msg(_("No pending documents to sync."))
+        return
+    end
+
+    local pending_menu
+    local menu_items = {}
+
+    -- Sort the files alphabetically by their clean filename
+    local files = {}
+    for file, _ in pairs(changed_docs) do
+        table.insert(files, file)
+    end
+    table.sort(files, function(a, b)
+        local a_name = a:match("([^/]+)$") or a
+        local b_name = b:match("([^/]+)$") or b
+        return a_name:lower() < b_name:lower()
+    end)
+
+    for i, file in ipairs(files) do
+        local clean_filename = file:match("([^/]+)$") or file
+        table.insert(menu_items, {
+            text = clean_filename,
+            callback = function()
+                UIManager:show(ConfirmBox:new{
+                    text = T(_("Do you want to sync this document?\n\n%1"), clean_filename),
+                    ok_text = _("Sync now"),
+                    cancel_text = _("Cancel"),
+                    ok_callback = function()
+                        local ui_document = plugin.ui and plugin.ui.document
+                        local document = plugin.manager:getDocumentByFile(file)
+                        if document then
+                            local is_temporary = (document ~= ui_document)
+                            utils.show_msg(T(_("Syncing %1..."), clean_filename))
+                            local success = plugin.manager:syncDocument(document, true)
+                            if is_temporary then
+                                document:close()
+                            end
+                            if success then
+                                utils.show_msg(T(_("Successfully synced %1"), clean_filename))
+                            else
+                                utils.show_msg(T(_("Failed to sync %1"), clean_filename))
+                            end
+                        else
+                            utils.show_msg(T(_("Could not open %1 for sync"), clean_filename))
+                        end
+                        -- Close pending menu and reopen to refresh the list
+                        if pending_menu then UIManager:close(pending_menu) end
+                        M.show_pending_documents(plugin)
+                    end,
+                    other_buttons = {
+                        {
+                            {
+                                text = _("Remove from list"),
+                                callback = function()
+                                    plugin.manager:removeFromChangedDocumentsFileByPath(file)
+                                    utils.show_msg(T(_("Removed %1 from sync list"), clean_filename))
+                                    if pending_menu then UIManager:close(pending_menu) end
+                                    M.show_pending_documents(plugin)
+                                end,
+                            }
+                        }
+                    }
+                })
+            end
+        })
+    end
+
+    pending_menu = Menu:new{
+        title = _("Pending Documents"),
+        item_table = menu_items,
+    }
+    UIManager:show(pending_menu)
+end
+
 return M

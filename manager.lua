@@ -278,6 +278,7 @@ function SyncManager:syncAllChangedDocuments()
         return
     end
     local count = 0
+    local failed_files = {}
     local ui_document = self.plugin.ui and self.plugin.ui.document
     for file, _ in pairs(changed_docs) do
         -- Try to get a document object for this file, open if needed
@@ -288,8 +289,11 @@ function SyncManager:syncAllChangedDocuments()
             local ok, success = pcall(self.syncDocument, self, document, false)
             if ok and success then
                 count = count + 1
-            elseif not ok then
-                logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(success))
+            else
+                if not ok then
+                    logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(success))
+                end
+                table.insert(failed_files, file)
             end
 
             if is_temporary then
@@ -303,6 +307,7 @@ function SyncManager:syncAllChangedDocuments()
                 self:removeFromChangedDocumentsFileByPath(file)
             else
                 logger.warn("AnnotationSync: could not open document for sync: " .. file)
+                table.insert(failed_files, file)
             end
         end
     end
@@ -311,6 +316,26 @@ function SyncManager:syncAllChangedDocuments()
     else
         self:updateLastSync("Sync All")
         utils.show_msg("Successfully synced modified documents: " .. count)
+    end
+
+    if #failed_files > 0 then
+        local filenames = {}
+        for _, file in ipairs(failed_files) do
+            table.insert(filenames, file:match("([^/]+)$") or file)
+        end
+        local ConfirmBox = require("ui/widget/confirmbox")
+        local list_str = "- " .. table.concat(filenames, "\n- ")
+        UIManager:nextTick(function()
+            UIManager:show(ConfirmBox:new{
+                text = T(_("Unable to sync the following document(s):\n%1\n\nWould you like to open the pending documents manager?"), list_str),
+                type = "yesno",
+                ok_text = _("Open Manager"),
+                ok_callback = function()
+                    menus.show_pending_documents(self.plugin)
+                end,
+                cancel_text = _("Close"),
+            })
+        end)
     end
 end
 
