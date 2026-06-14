@@ -36,8 +36,8 @@ jobs:
           repository: koreader/koreader
           path: koreader_core
           ref: v2026.03
-          fetch-depth: 0
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
       - name: Checkout AnnotationSync Plugin
         uses: actions/checkout@v4
