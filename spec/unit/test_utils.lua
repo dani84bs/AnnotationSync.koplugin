@@ -44,7 +44,8 @@ function M.init_integration_context(file, AnnotationSyncPlugin)
     local sync_instance = AnnotationSyncPlugin:new{ 
         ui = readerui, 
         plugin_id = "AnnotationSync",
-        version = "test"
+        version = "test",
+        path = "plugins/AnnotationSync.koplugin",
     }
     
     -- In a real scenario, PluginLoader calls init.
