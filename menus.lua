@@ -31,9 +31,7 @@ function M.show_deleted_annotations(plugin, document)
                 type = "yesno",
                 ok_text = _("Restore All"),
                 ok_callback = function()
-                    for _, ann in ipairs(deleted) do
-                        plugin:restoreAnnotation(ann, true) -- true = silent
-                    end
+                    plugin:restoreAnnotations(deleted, true) -- true = silent
                     utils.show_msg(T(_("Restored %1 annotations."), #deleted))
                     if deleted_menu then UIManager:close(deleted_menu) end
                 end
