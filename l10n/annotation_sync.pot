@@ -1,0 +1,395 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the AnnotationSync package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: AnnotationSync 1.2.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-14 19:18+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: _meta.lua:4 main.lua:132
+msgid "Annotation Sync"
+msgstr ""
+
+#: _meta.lua:5
+msgid "annotation_sync_plugin"
+msgstr ""
+
+#: _meta.lua:6
+msgid "Sync annotations and bookmarks between devices."
+msgstr ""
+
+#: main.lua:136
+msgid "Settings"
+msgstr ""
+
+#: main.lua:139
+msgid "Cloud settings"
+msgstr ""
+
+#: main.lua:158
+msgid "Use filename instead of hash"
+msgstr ""
+
+#: main.lua:169
+msgid "Automatically Sync All when network becomes available"
+msgstr ""
+
+#: main.lua:183
+msgid "Enable Reading Progress Sync"
+msgstr ""
+
+#: main.lua:197
+msgid "Sync using last word of page"
+msgstr ""
+
+#: main.lua:212
+msgid "Sync every %1 pages"
+msgstr ""
+
+#: main.lua:220
+msgid "Sync every # pages"
+msgstr ""
+
+#: main.lua:244
+msgid "Device name: %1"
+msgstr ""
+
+#: main.lua:257
+msgid "Set device name"
+msgstr ""
+
+#: main.lua:258
+msgid "Leave empty to use the default device name."
+msgstr ""
+
+#: main.lua:277
+msgid "Show changed settings"
+msgstr ""
+
+#: main.lua:286
+msgid "None"
+msgstr ""
+
+#: main.lua:287
+msgid "Current cloud: %1"
+msgstr ""
+
+#: main.lua:294
+msgid "Push settings to cloud"
+msgstr ""
+
+#: main.lua:301 menus.lua:169
+msgid "Pull settings from cloud"
+msgstr ""
+
+#: main.lua:308
+msgid "Manual Sync"
+msgstr ""
+
+#: main.lua:318 menus.lua:129
+msgid "Jump to device progress"
+msgstr ""
+
+#: main.lua:329
+msgid "Sync All"
+msgstr ""
+
+#: main.lua:340
+msgid "Show pending/unsynced documents"
+msgstr ""
+
+#: main.lua:347
+msgid "Show Deleted"
+msgstr ""
+
+#: main.lua:357
+msgid "Last sync: %1"
+msgstr ""
+
+#: main.lua:361
+msgid "Plugin version: %1"
+msgstr ""
+
+#: main.lua:365
+msgid ""
+"%1 (%4)\n"
+"Version: %2\n"
+"\n"
+"%3"
+msgstr ""
+
+#: main.lua:374
+msgid "Why are some options greyed out?"
+msgstr ""
+
+#: main.lua:377
+msgid ""
+"Reading progress sync features are disabled because your KOReader version "
+"does not support the cloudstorage plugin.\n"
+"\n"
+"These features require a newer KOReader release (not yet available in stable "
+"releases)."
+msgstr ""
+
+#: main.lua:454 manager.lua:239
+msgid "Reading progress sync is not supported on this version of KOReader."
+msgstr ""
+
+#: main.lua:459
+msgid "A document must be active to jump to device progress."
+msgstr ""
+
+#: main.lua:500
+msgid "AnnotationSync: Manual Sync"
+msgstr ""
+
+#: main.lua:508
+msgid "AnnotationSync: Push settings to cloud"
+msgstr ""
+
+#: main.lua:509
+msgid "Push the selected settings to the cloud."
+msgstr ""
+
+#: main.lua:516
+msgid "AnnotationSync: Pull settings from cloud"
+msgstr ""
+
+#: main.lua:517
+msgid "Pull the selected settings from the cloud."
+msgstr ""
+
+#: main.lua:524
+msgid "AnnotationSync: Jump to device progress"
+msgstr ""
+
+#: main.lua:532
+msgid "AnnotationSync: Sync All"
+msgstr ""
+
+#: main.lua:551
+msgid ""
+"Cloud destination set to:\n"
+"%1\n"
+"Provider: %2"
+msgstr ""
+
+#: main.lua:601
+msgid "Annotation restored."
+msgstr ""
+
+#: main.lua:603 menus.lua:35
+msgid "Restored %1 annotations."
+msgstr ""
+
+#: manager.lua:244
+msgid "Network is disconnected, cannot pull progress"
+msgstr ""
+
+#: manager.lua:263
+msgid "Fetching remote progress..."
+msgstr ""
+
+#: manager.lua:268
+msgid "Failed to fetch remote progress"
+msgstr ""
+
+#: manager.lua:330
+msgid ""
+"Unable to sync the following document(s):\n"
+"%1\n"
+"\n"
+"Would you like to open the pending documents manager?"
+msgstr ""
+
+#: manager.lua:332
+msgid "Open Manager"
+msgstr ""
+
+#: manager.lua:336 menus.lua:57
+msgid "Close"
+msgstr ""
+
+#: manager.lua:524 manager.lua:533
+msgid "No hash"
+msgstr ""
+
+#: manager.lua:623
+msgid ""
+"No settings are selected. Please select settings to sync in 'Show changed "
+"settings'."
+msgstr ""
+
+#: manager.lua:639
+msgid "Failed to write settings to local storage."
+msgstr ""
+
+#: manager.lua:644
+msgid "Pushing settings to cloud..."
+msgstr ""
+
+#: manager.lua:757
+msgid "Network is disconnected, cannot pull settings"
+msgstr ""
+
+#: manager.lua:763
+msgid "Fetching settings from cloud..."
+msgstr ""
+
+#: manager.lua:768
+msgid "Failed to fetch settings from cloud"
+msgstr ""
+
+#: menus.lua:17
+msgid "No deleted annotations found for this document."
+msgstr ""
+
+#: menus.lua:26 menus.lua:32
+msgid "Restore All"
+msgstr ""
+
+#: menus.lua:30
+msgid "Are you sure you want to restore all %1 deleted annotations?"
+msgstr ""
+
+#: menus.lua:44 menus.lua:45
+msgid "Highlight"
+msgstr ""
+
+#: menus.lua:53
+msgid ""
+"Do you want to restore this annotation?\n"
+"\n"
+"Page %1: %2"
+msgstr ""
+
+#: menus.lua:56
+msgid "Restore"
+msgstr ""
+
+#: menus.lua:67
+msgid "Deleted Annotations"
+msgstr ""
+
+#: menus.lua:99
+msgid "(this device)"
+msgstr ""
+
+#: menus.lua:117
+msgid "Jumped to page %1 from %2"
+msgstr ""
+
+#: menus.lua:124
+msgid "No remote progress found."
+msgstr ""
+
+#: menus.lua:164
+msgid "No other devices found in cloud settings."
+msgstr ""
+
+#: menus.lua:218
+msgid "No differing settings found for this device."
+msgstr ""
+
+#: menus.lua:230
+msgid "Import Selected Settings"
+msgstr ""
+
+#: menus.lua:243
+msgid "Successfully imported %1 settings."
+msgstr ""
+
+#: menus.lua:245
+msgid "No settings imported."
+msgstr ""
+
+#: menus.lua:255 settings_selection.lua:287
+msgid "Select All"
+msgstr ""
+
+#: menus.lua:265 settings_selection.lua:301
+msgid "Clear Selection"
+msgstr ""
+
+#: menus.lua:291
+msgid "Settings from %1"
+msgstr ""
+
+#: menus.lua:300
+msgid "No pending documents to sync."
+msgstr ""
+
+#: menus.lua:324
+msgid ""
+"Do you want to sync this document?\n"
+"\n"
+"%1"
+msgstr ""
+
+#: menus.lua:325
+msgid "Sync now"
+msgstr ""
+
+#: menus.lua:326
+msgid "Cancel"
+msgstr ""
+
+#: menus.lua:332
+msgid "Syncing %1..."
+msgstr ""
+
+#: menus.lua:338
+msgid "Successfully synced %1"
+msgstr ""
+
+#: menus.lua:340
+msgid "Failed to sync %1"
+msgstr ""
+
+#: menus.lua:343
+msgid "Could not open %1 for sync"
+msgstr ""
+
+#: menus.lua:352
+msgid "Remove from list"
+msgstr ""
+
+#: menus.lua:355
+msgid "Removed %1 from sync list"
+msgstr ""
+
+#: menus.lua:368
+msgid "Pending Documents"
+msgstr ""
+
+#: remote.lua:28
+msgid "Cloud Storage plugin is not enabled or available."
+msgstr ""
+
+#: remote.lua:46
+msgid "No cloud destination set in settings."
+msgstr ""
+
+#: remote.lua:92
+msgid "Successfully synchronized."
+msgstr ""
+
+#: settings_selection.lua:368
+msgid "No changed settings found."
+msgstr ""
+
+#: settings_selection.lua:380
+msgid "Changed Settings"
+msgstr ""

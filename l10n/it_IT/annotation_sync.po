@@ -1,0 +1,416 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the AnnotationSync package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: AnnotationSync 1.2.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-14 19:18+0200\n"
+"PO-Revision-Date: 2026-06-14 19:42+0200\n"
+"Last-Translator: Antigravity\n"
+"Language-Team: Italian\n"
+"Language: it_IT\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: _meta.lua:4 main.lua:132
+msgid "Annotation Sync"
+msgstr "Sincronizzazione Annotazioni"
+
+#: _meta.lua:5
+msgid "annotation_sync_plugin"
+msgstr "annotation_sync_plugin"
+
+#: _meta.lua:6
+msgid "Sync annotations and bookmarks between devices."
+msgstr "Sincronizza annotazioni e segnalibri tra dispositivi."
+
+#: main.lua:136
+msgid "Settings"
+msgstr "Impostazioni"
+
+#: main.lua:139
+msgid "Cloud settings"
+msgstr "Impostazioni cloud"
+
+#: main.lua:158
+msgid "Use filename instead of hash"
+msgstr "Usa il nome del file invece dell'hash"
+
+#: main.lua:169
+msgid "Automatically Sync All when network becomes available"
+msgstr "Sincronizza tutto automaticamente quando la rete diventa disponibile"
+
+#: main.lua:183
+msgid "Enable Reading Progress Sync"
+msgstr "Abilita sincronizzazione progresso di lettura"
+
+#: main.lua:197
+msgid "Sync using last word of page"
+msgstr "Sincronizza usando l'ultima parola della pagina"
+
+#: main.lua:212
+msgid "Sync every %1 pages"
+msgstr "Sincronizza ogni %1 pagine"
+
+#: main.lua:220
+msgid "Sync every # pages"
+msgstr "Sincronizza ogni # pagine"
+
+#: main.lua:244
+msgid "Device name: %1"
+msgstr "Nome dispositivo: %1"
+
+#: main.lua:257
+msgid "Set device name"
+msgstr "Imposta nome dispositivo"
+
+#: main.lua:258
+msgid "Leave empty to use the default device name."
+msgstr "Lascia vuoto per usare il nome dispositivo predefinito."
+
+#: main.lua:277
+msgid "Show changed settings"
+msgstr "Mostra impostazioni modificate"
+
+#: main.lua:286
+msgid "None"
+msgstr "Nessuno"
+
+#: main.lua:287
+msgid "Current cloud: %1"
+msgstr "Cloud corrente: %1"
+
+#: main.lua:294
+msgid "Push settings to cloud"
+msgstr "Invia impostazioni al cloud"
+
+#: main.lua:301 menus.lua:169
+msgid "Pull settings from cloud"
+msgstr "Ricevi impostazioni dal cloud"
+
+#: main.lua:308
+msgid "Manual Sync"
+msgstr "Sincronizzazione manuale"
+
+#: main.lua:318 menus.lua:129
+msgid "Jump to device progress"
+msgstr "Vai al progresso del dispositivo"
+
+#: main.lua:329
+msgid "Sync All"
+msgstr "Sincronizza tutto"
+
+#: main.lua:340
+msgid "Show pending/unsynced documents"
+msgstr "Mostra documenti in attesa/non sincronizzati"
+
+#: main.lua:347
+msgid "Show Deleted"
+msgstr "Mostra eliminati"
+
+#: main.lua:357
+msgid "Last sync: %1"
+msgstr "Ultima sincronizzazione: %1"
+
+#: main.lua:361
+msgid "Plugin version: %1"
+msgstr "Versione plugin: %1"
+
+#: main.lua:365
+msgid ""
+"%1 (%4)\n"
+"Version: %2\n"
+"\n"
+"%3"
+msgstr ""
+"%1 (%4)\n"
+"Versione: %2\n"
+"\n"
+"%3"
+
+#: main.lua:374
+msgid "Why are some options greyed out?"
+msgstr "Perché alcune opzioni sono disattivate?"
+
+#: main.lua:377
+msgid ""
+"Reading progress sync features are disabled because your KOReader version "
+"does not support the cloudstorage plugin.\n"
+"\n"
+"These features require a newer KOReader release (not yet available in stable "
+"releases)."
+msgstr ""
+"Le funzioni di sincronizzazione del progresso di lettura sono disabilitate perché la tua versione di KOReader non supporta il plugin cloudstorage.\n"
+"\n"
+"Queste funzionalità richiedono una versione di KOReader più recente (non ancora disponibile nelle versioni stabili)."
+
+#: main.lua:454 manager.lua:239
+msgid "Reading progress sync is not supported on this version of KOReader."
+msgstr "La sincronizzazione del progresso di lettura non è supportata su questa versione di KOReader."
+
+#: main.lua:459
+msgid "A document must be active to jump to device progress."
+msgstr "Un documento deve essere attivo per passare al progresso del dispositivo."
+
+#: main.lua:500
+msgid "AnnotationSync: Manual Sync"
+msgstr "AnnotationSync: Sincronizzazione manuale"
+
+#: main.lua:508
+msgid "AnnotationSync: Push settings to cloud"
+msgstr "AnnotationSync: Invia impostazioni al cloud"
+
+#: main.lua:509
+msgid "Push the selected settings to the cloud."
+msgstr "Invia le impostazioni selezionate al cloud."
+
+#: main.lua:516
+msgid "AnnotationSync: Pull settings from cloud"
+msgstr "AnnotationSync: Ricevi impostazioni dal cloud"
+
+#: main.lua:517
+msgid "Pull the selected settings from the cloud."
+msgstr "Ricevi le impostazioni selezionate dal cloud."
+
+#: main.lua:524
+msgid "AnnotationSync: Jump to device progress"
+msgstr "AnnotationSync: Vai al progresso del dispositivo"
+
+#: main.lua:532
+msgid "AnnotationSync: Sync All"
+msgstr "AnnotationSync: Sincronizza tutto"
+
+#: main.lua:551
+msgid ""
+"Cloud destination set to:\n"
+"%1\n"
+"Provider: %2"
+msgstr ""
+"Destinazione cloud impostata su:\n"
+"%1\n"
+"Provider: %2"
+
+#: main.lua:601
+msgid "Annotation restored."
+msgstr "Annotazione ripristinata."
+
+#: main.lua:603 menus.lua:35
+msgid "Restored %1 annotations."
+msgstr "Ripristinate %1 annotazioni."
+
+#: manager.lua:244
+msgid "Network is disconnected, cannot pull progress"
+msgstr "La rete è disconnessa, impossibile ricevere i progressi"
+
+#: manager.lua:263
+msgid "Fetching remote progress..."
+msgstr "Recupero dei progressi remoti in corso..."
+
+#: manager.lua:268
+msgid "Failed to fetch remote progress"
+msgstr "Impossibile recuperare i progressi remoti"
+
+#: manager.lua:330
+msgid ""
+"Unable to sync the following document(s):\n"
+"%1\n"
+"\n"
+"Would you like to open the pending documents manager?"
+msgstr ""
+"Impossibile sincronizzare i seguenti documenti:\n"
+"%1\n"
+"\n"
+"Vuoi aprire il gestore dei documenti in attesa?"
+
+#: manager.lua:332
+msgid "Open Manager"
+msgstr "Apri gestore"
+
+#: manager.lua:336 menus.lua:57
+msgid "Close"
+msgstr "Chiudi"
+
+#: manager.lua:524 manager.lua:533
+msgid "No hash"
+msgstr "Nessun hash"
+
+#: manager.lua:623
+msgid ""
+"No settings are selected. Please select settings to sync in 'Show changed "
+"settings'."
+msgstr ""
+"Nessuna impostazione selezionata. Seleziona le impostazioni da sincronizzare in 'Mostra impostazioni modificate'."
+
+#: manager.lua:639
+msgid "Failed to write settings to local storage."
+msgstr "Impossibile scrivere le impostazioni nella memoria locale."
+
+#: manager.lua:644
+msgid "Pushing settings to cloud..."
+msgstr "Invio delle impostazioni al cloud in corso..."
+
+#: manager.lua:757
+msgid "Network is disconnected, cannot pull settings"
+msgstr "La rete è disconnessa, impossibile ricevere le impostazioni"
+
+#: manager.lua:763
+msgid "Fetching settings from cloud..."
+msgstr "Recupero delle impostazioni dal cloud in corso..."
+
+#: manager.lua:768
+msgid "Failed to fetch settings from cloud"
+msgstr "Impossibile recuperare le impostazioni dal cloud"
+
+#: menus.lua:17
+msgid "No deleted annotations found for this document."
+msgstr "Nessuna annotazione eliminata trovata per questo documento."
+
+#: menus.lua:26 menus.lua:32
+msgid "Restore All"
+msgstr "Ripristina tutto"
+
+#: menus.lua:30
+msgid "Are you sure you want to restore all %1 deleted annotations?"
+msgstr "Sei sicuro di voler ripristinare tutte le %1 annotazioni eliminate?"
+
+#: menus.lua:44 menus.lua:45
+msgid "Highlight"
+msgstr "Evidenziatura"
+
+#: menus.lua:53
+msgid ""
+"Do you want to restore this annotation?\n"
+"\n"
+"Page %1: %2"
+msgstr ""
+"Vuoi ripristinare questa annotazione?\n"
+"\n"
+"Pagina %1: %2"
+
+#: menus.lua:56
+msgid "Restore"
+msgstr "Ripristina"
+
+#: menus.lua:67
+msgid "Deleted Annotations"
+msgstr "Annotazioni eliminate"
+
+#: menus.lua:99
+msgid "(this device)"
+msgstr "(questo dispositivo)"
+
+#: menus.lua:117
+msgid "Jumped to page %1 from %2"
+msgstr "Passato alla pagina %1 da %2"
+
+#: menus.lua:124
+msgid "No remote progress found."
+msgstr "Nessun progresso remoto trovato."
+
+#: menus.lua:164
+msgid "No other devices found in cloud settings."
+msgstr "Nessun altro dispositivo trovato nelle impostazioni cloud."
+
+#: menus.lua:218
+msgid "No differing settings found for this device."
+msgstr "Nessuna impostazione differente trovata per questo dispositivo."
+
+#: menus.lua:230
+msgid "Import Selected Settings"
+msgstr "Importa impostazioni selezionate"
+
+#: menus.lua:243
+msgid "Successfully imported %1 settings."
+msgstr "Importate con successo %1 impostazioni."
+
+#: menus.lua:245
+msgid "No settings imported."
+msgstr "Nessuna impostazione importata."
+
+#: menus.lua:255 settings_selection.lua:287
+msgid "Select All"
+msgstr "Seleziona tutto"
+
+#: menus.lua:265 settings_selection.lua:301
+msgid "Clear Selection"
+msgstr "Cancella selezione"
+
+#: menus.lua:291
+msgid "Settings from %1"
+msgstr "Impostazioni da %1"
+
+#: menus.lua:300
+msgid "No pending documents to sync."
+msgstr "Nessun documento in attesa da sincronizzare."
+
+#: menus.lua:324
+msgid ""
+"Do you want to sync this document?\n"
+"\n"
+"%1"
+msgstr ""
+"Vuoi sincronizzare questo documento?\n"
+"\n"
+"%1"
+
+#: menus.lua:325
+msgid "Sync now"
+msgstr "Sincronizza ora"
+
+#: menus.lua:326
+msgid "Cancel"
+msgstr "Annulla"
+
+#: menus.lua:332
+msgid "Syncing %1..."
+msgstr "Sincronizzazione di %1 in corso..."
+
+#: menus.lua:338
+msgid "Successfully synced %1"
+msgstr "%1 sincronizzato con successo"
+
+#: menus.lua:340
+msgid "Failed to sync %1"
+msgstr "Impossibile sincronizzare %1"
+
+#: menus.lua:343
+msgid "Could not open %1 for sync"
+msgstr "Impossibile aprire %1 per la sincronizzazione"
+
+#: menus.lua:352
+msgid "Remove from list"
+msgstr "Rimuovi dalla lista"
+
+#: menus.lua:355
+msgid "Removed %1 from sync list"
+msgstr "Rimosso %1 dall'elenco di sincronizzazione"
+
+#: menus.lua:368
+msgid "Pending Documents"
+msgstr "Documenti in attesa"
+
+#: remote.lua:28
+msgid "Cloud Storage plugin is not enabled or available."
+msgstr "Il plugin Cloud Storage non è abilitato o disponibile."
+
+#: remote.lua:46
+msgid "No cloud destination set in settings."
+msgstr "Nessuna destinazione cloud impostata nelle impostazioni."
+
+#: remote.lua:92
+msgid "Successfully synchronized."
+msgstr "Sincronizzato con successo."
+
+#: settings_selection.lua:368
+msgid "No changed settings found."
+msgstr "Nessuna impostazione modificata trovata."
+
+#: settings_selection.lua:380
+msgid "Changed Settings"
+msgstr "Impostazioni modificate"

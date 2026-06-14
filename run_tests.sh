@@ -10,6 +10,10 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
+# Compile plugin translations
+echo ">> Compiling plugin translations..."
+make -C "$(dirname "$0")" mo
+
 # Resolve absolute paths
 KO_DIR=$(cd "$1" && pwd)
 PLUGIN_DIR="$KO_DIR/plugins/AnnotationSync.koplugin"

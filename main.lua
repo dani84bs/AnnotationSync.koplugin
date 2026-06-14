@@ -8,7 +8,8 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
 local json = require("json")
 local util = require("util")
-local _ = require("gettext")
+local gettext = require("gettext")
+local _ = gettext
 local DataStorage = require("datastorage")
 local logger = require("logger")
 
@@ -90,6 +91,18 @@ function AnnotationSyncPlugin:init()
     end
 
     self.settings_key = self.plugin_id
+
+    -- Load plugin translations dynamically if available for the active locale
+    local lang = gettext.current_lang
+    if lang and lang ~= "C" and lang ~= "" then
+        local path = self.path or "plugins/AnnotationSync.koplugin"
+        local mo_path = string.format("%s/l10n/%s/annotation_sync.mo", path, lang)
+        local f = io.open(mo_path, "r")
+        if f then
+            f:close()
+            gettext.loadMO(mo_path)
+        end
+    end
 
     self:registerEvents()
 end
