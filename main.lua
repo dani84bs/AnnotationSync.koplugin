@@ -562,27 +562,39 @@ function AnnotationSyncPlugin:showDeletedAnnotations()
     menus.show_deleted_annotations(self, document)
 end
 
-function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
+function AnnotationSyncPlugin:restoreAnnotations(anns, silent)
     local document = self.ui and self.ui.document
-    if not document then return end
+    if not document or not anns or #anns == 0 then return end
 
-    -- 1. Mark as not deleted and update timestamp
-    ann.deleted = false
-    ann.datetime_updated = os.date("%Y-%m-%d %H:%M:%S")
-    
-    -- 2. Add back to current list
+    local now = os.date("%Y-%m-%d %H:%M:%S")
     local current = self.manager:getAnnotationsForDocument(document)
-    table.insert(current, ann)
-    
-    -- 3. Apply changes (saves to sidecar and refreshes UI)
+
+    for _, ann in ipairs(anns) do
+        -- 1. Mark as not deleted and update timestamp
+        ann.deleted = false
+        ann.datetime_updated = now
+
+        -- 2. Add back to current list
+        table.insert(current, ann)
+    end
+
+    -- 3. Apply changes once (saves to sidecar and refreshes UI)
     self:applySyncedAnnotations(document, current)
 
     -- 4. Flush to local sync JSON immediately (Fix for Issue #39 delayed flush)
     self.manager:writeAnnotationsJSON(document)
 
     if not silent then
-        utils.show_msg(_("Annotation restored."))
+        if #anns == 1 then
+            utils.show_msg(_("Annotation restored."))
+        else
+            utils.show_msg(T(_("Restored %1 annotations."), #anns))
+        end
     end
+end
+
+function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
+    self:restoreAnnotations({ann}, silent)
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)

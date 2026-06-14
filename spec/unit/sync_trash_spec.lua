@@ -114,15 +114,27 @@ describe("AnnotationSync Trash & Restore", function()
             { page = 2, pos0 = "p3", pos1 = "p4", text = "Two", deleted = true }
         }
 
-        -- 1. Restore all
-        for _, ann in ipairs(deleted_items) do
-            sync_instance:restoreAnnotation(ann, true) -- silent
+        -- Mock event broadcast tracking
+        local event_count = 0
+        local old_event_new = require("ui/event").new
+        require("ui/event").new = function(self_ev, name, ...)
+            if name == "AnnotationsModified" then
+                event_count = event_count + 1
+            end
+            return old_event_new(self_ev, name, ...)
         end
+
+        -- 1. Restore all
+        sync_instance:restoreAnnotations(deleted_items, true) -- silent
 
         -- 2. Verify
         assert.is_equal(2, #readerui.annotation.annotations)
         for _, ann in ipairs(readerui.annotation.annotations) do
             assert.is_false(ann.deleted)
         end
+        assert.is_equal(1, event_count, "AnnotationsModified event should only be broadcasted once")
+
+        -- Cleanup
+        require("ui/event").new = old_event_new
     end)
 end)
