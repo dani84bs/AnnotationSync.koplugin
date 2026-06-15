@@ -1,0 +1,421 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the AnnotationSync package.
+# Kónya Márton <konyamarci52@proton.me>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: AnnotationSync 1.2.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-14 19:18+0200\n"
+"PO-Revision-Date: 2026-06-15 19:37+0200\n"
+"Last-Translator: Kónya Márton <konyamarci52@proton.me>\n"
+"Language-Team: \n"
+"Language: hu\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Poedit 3.9\n"
+
+#: _meta.lua:4 main.lua:132
+msgid "Annotation Sync"
+msgstr "Kiemelések szinkronizálása"
+
+#: _meta.lua:5
+msgid "annotation_sync_plugin"
+msgstr "annotation_sync_plugin"
+
+#: _meta.lua:6
+msgid "Sync annotations and bookmarks between devices."
+msgstr "Kiemelések és könyvjelzők szinkronizációja több eszköz között."
+
+#: main.lua:136
+msgid "Settings"
+msgstr "Beállítások"
+
+#: main.lua:139
+msgid "Cloud settings"
+msgstr "Felhőbeállítások"
+
+#: main.lua:158
+msgid "Use filename instead of hash"
+msgstr "Fájlnév használata hash helyett"
+
+#: main.lua:169
+msgid "Automatically Sync All when network becomes available"
+msgstr "Minden szinkronizációja amikor a hálózat elérhetővé válik"
+
+#: main.lua:183
+msgid "Enable Reading Progress Sync"
+msgstr "Olvasási állapot szinkronizáció engedélyezése"
+
+#: main.lua:197
+msgid "Sync using last word of page"
+msgstr "Szinkronizáció oldal utolsó szava alapján"
+
+#: main.lua:212
+msgid "Sync every %1 pages"
+msgstr "Szinkronizáció %1 oldalanként"
+
+#: main.lua:220
+msgid "Sync every # pages"
+msgstr "Szinkronizáció ennyi oldalanként"
+
+#: main.lua:244
+msgid "Device name: %1"
+msgstr "Eszköznév: %1"
+
+#: main.lua:257
+msgid "Set device name"
+msgstr "Eszköznév beállítása"
+
+#: main.lua:258
+msgid "Leave empty to use the default device name."
+msgstr "Üresen hagyva az alap eszköznév lesz használatban."
+
+#: main.lua:277
+msgid "Show changed settings"
+msgstr "Módosított beállítások mutatása"
+
+#: main.lua:286
+msgid "None"
+msgstr "Semelyik"
+
+#: main.lua:287
+msgid "Current cloud: %1"
+msgstr "Jelenlegi felhő: %1"
+
+#: main.lua:294
+msgid "Push settings to cloud"
+msgstr "Beállítások felszinkronizálása"
+
+#: main.lua:301 menus.lua:169
+msgid "Pull settings from cloud"
+msgstr "Beállítások leszinkronizálása"
+
+#: main.lua:308
+msgid "Manual Sync"
+msgstr "Kézi szinkronizáció"
+
+#: main.lua:318 menus.lua:129
+msgid "Jump to device progress"
+msgstr "Olvasási állapothoz ugrás"
+
+#: main.lua:329
+msgid "Sync All"
+msgstr "Minden szinkronizálása"
+
+#: main.lua:340
+msgid "Show pending/unsynced documents"
+msgstr "Sorba állítottak/nem szinkronizáltak mutatása"
+
+#: main.lua:347
+msgid "Show Deleted"
+msgstr "Töröltek mutatása"
+
+#: main.lua:357
+msgid "Last sync: %1"
+msgstr "Utolsó szinkronizáció: %1"
+
+#: main.lua:361
+msgid "Plugin version: %1"
+msgstr "Bővítmény verzió: %1"
+
+#: main.lua:365
+msgid ""
+"%1 (%4)\n"
+"Version: %2\n"
+"\n"
+"%3"
+msgstr ""
+"%1 (%4)\n"
+"Verzió: %2\n"
+"\n"
+"%3"
+
+#: main.lua:374
+msgid "Why are some options greyed out?"
+msgstr "Miért van néhány opció kiszürkítve?"
+
+#: main.lua:377
+msgid ""
+"Reading progress sync features are disabled because your KOReader version "
+"does not support the cloudstorage plugin.\n"
+"\n"
+"These features require a newer KOReader release (not yet available in stable "
+"releases)."
+msgstr ""
+"Az Olvasási állapot szinkronizáció ki van kapcsolva, mert ez a KOReader "
+"verzió nem támogatja a cloudstorage bővítményt.\n"
+"\n"
+"A KOReader egy újabb verziójára van szükség (még nem elérhető a stabil "
+"verzióban)."
+
+#: main.lua:454 manager.lua:239
+msgid "Reading progress sync is not supported on this version of KOReader."
+msgstr ""
+"Olvasási állapot szinkronizáció nem támogatott ezen a KOReader verzión."
+
+#: main.lua:459
+msgid "A document must be active to jump to device progress."
+msgstr "Egy dokumentumnak aktívnak kell lennie állapothoz ugráshoz."
+
+#: main.lua:500
+msgid "AnnotationSync: Manual Sync"
+msgstr "Kiemelések szinkronizálása: Kézi szinkronizálás"
+
+#: main.lua:508
+msgid "AnnotationSync: Push settings to cloud"
+msgstr "Kiemelések szinkronizálása: Beállítások felszinkronizálása"
+
+#: main.lua:509
+msgid "Push the selected settings to the cloud."
+msgstr "A kiválasztott beállítások felszinkronizálása a felhőbe."
+
+#: main.lua:516
+msgid "AnnotationSync: Pull settings from cloud"
+msgstr "Kiemelések szinkronizálása: Beállítások leszinkronizálása"
+
+#: main.lua:517
+msgid "Pull the selected settings from the cloud."
+msgstr "A kiválasztott beállítások leszinkronizálása a felhőből."
+
+#: main.lua:524
+msgid "AnnotationSync: Jump to device progress"
+msgstr "Kiemelések szinkronizálása: Olvasási állapothoz ugrás"
+
+#: main.lua:532
+msgid "AnnotationSync: Sync All"
+msgstr "Kiemelések szinkronizálása: Minden szinkronizálása"
+
+#: main.lua:551
+msgid ""
+"Cloud destination set to:\n"
+"%1\n"
+"Provider: %2"
+msgstr ""
+"Felhő cél beállítva erre:\n"
+"%1\n"
+"Szolgáltató: %2"
+
+#: main.lua:601
+msgid "Annotation restored."
+msgstr "Kiemelés visszaállítva."
+
+#: main.lua:603 menus.lua:35
+msgid "Restored %1 annotations."
+msgstr "%1 kiemelés visszaállítva."
+
+#: manager.lua:244
+msgid "Network is disconnected, cannot pull progress"
+msgstr "Hálózat nem elérhető, nem lehet állapotot lekérni"
+
+#: manager.lua:263
+msgid "Fetching remote progress..."
+msgstr "Távoli állapot lekérése..."
+
+#: manager.lua:268
+msgid "Failed to fetch remote progress"
+msgstr "Nem sikerült a távoli állapot lekérése"
+
+#: manager.lua:330
+msgid ""
+"Unable to sync the following document(s):\n"
+"%1\n"
+"\n"
+"Would you like to open the pending documents manager?"
+msgstr ""
+"Alábbi dokumentumo(ka)t nem sikerült szinkronizálni:\n"
+"%1\n"
+"\n"
+"Sorba állított dokumentum kezelő megnyitása?"
+
+#: manager.lua:332
+msgid "Open Manager"
+msgstr "Kezelő megnyitása"
+
+#: manager.lua:336 menus.lua:57
+msgid "Close"
+msgstr "Bezárás"
+
+#: manager.lua:524 manager.lua:533
+msgid "No hash"
+msgstr "Nincs hash"
+
+#: manager.lua:623
+msgid ""
+"No settings are selected. Please select settings to sync in 'Show changed "
+"settings'."
+msgstr ""
+"Nincs beállítás kiválasztva. Beállítások kiválasztása „Módosított "
+"beállítások mutatása” alatt."
+
+#: manager.lua:639
+msgid "Failed to write settings to local storage."
+msgstr "Nem sikerült a beállításokat a helyi tárolóba menteni."
+
+#: manager.lua:644
+msgid "Pushing settings to cloud..."
+msgstr "Beállítások felszinkronizálása..."
+
+#: manager.lua:757
+msgid "Network is disconnected, cannot pull settings"
+msgstr "Hálózat nem elérhető, nem lehet beállításokat leszinkronizálni"
+
+#: manager.lua:763
+msgid "Fetching settings from cloud..."
+msgstr "Beállítások leszinkronizálása..."
+
+#: manager.lua:768
+msgid "Failed to fetch settings from cloud"
+msgstr "Nem sikerült leszinkronizálni a beállításokat"
+
+#: menus.lua:17
+msgid "No deleted annotations found for this document."
+msgstr "Nem található törölt kiemelés ehhez a dokumentumhoz."
+
+#: menus.lua:26 menus.lua:32
+msgid "Restore All"
+msgstr "Minden visszaállítása"
+
+#: menus.lua:30
+msgid "Are you sure you want to restore all %1 deleted annotations?"
+msgstr "Vissza legyen állítva %1 törölt kiemelés?"
+
+#: menus.lua:44 menus.lua:45
+msgid "Highlight"
+msgstr "Kiemelés"
+
+#: menus.lua:53
+msgid ""
+"Do you want to restore this annotation?\n"
+"\n"
+"Page %1: %2"
+msgstr ""
+"Ezen kiemelés visszaállítása?\n"
+"\n"
+"%1. oldal: %2"
+
+#: menus.lua:56
+msgid "Restore"
+msgstr "Visszaállítás"
+
+#: menus.lua:67
+msgid "Deleted Annotations"
+msgstr "Törölt kiemelések"
+
+#: menus.lua:99
+msgid "(this device)"
+msgstr "(ez az eszköz)"
+
+#: menus.lua:117
+msgid "Jumped to page %1 from %2"
+msgstr "%2. oldalról %1. oldalra ugorva"
+
+#: menus.lua:124
+msgid "No remote progress found."
+msgstr "Nem található távoli állapot."
+
+#: menus.lua:164
+msgid "No other devices found in cloud settings."
+msgstr "Nem található más eszköz beállításai a felhőben."
+
+#: menus.lua:218
+msgid "No differing settings found for this device."
+msgstr "Nem található eltérő beállítás ehhez az eszközhöz."
+
+#: menus.lua:230
+msgid "Import Selected Settings"
+msgstr "Kivélasztott beállítások importálása"
+
+#: menus.lua:243
+msgid "Successfully imported %1 settings."
+msgstr "Sikeresen importálva %1 beállítás."
+
+#: menus.lua:245
+msgid "No settings imported."
+msgstr "Nem lett beállítás importálva."
+
+#: menus.lua:255 settings_selection.lua:287
+msgid "Select All"
+msgstr "Minden kiválasztása"
+
+#: menus.lua:265 settings_selection.lua:301
+msgid "Clear Selection"
+msgstr "Kiválasztás megszünetése"
+
+#: menus.lua:291
+msgid "Settings from %1"
+msgstr "Beállítások innen: %1"
+
+#: menus.lua:300
+msgid "No pending documents to sync."
+msgstr "Nem található szinkronizációhoz sorba állított dokumentum."
+
+#: menus.lua:324
+msgid ""
+"Do you want to sync this document?\n"
+"\n"
+"%1"
+msgstr ""
+"Ezen dokumentum szinkronizációja?\n"
+"\n"
+"%1"
+
+#: menus.lua:325
+msgid "Sync now"
+msgstr "Szinkronizáció most"
+
+#: menus.lua:326
+msgid "Cancel"
+msgstr "Mégse"
+
+#: menus.lua:332
+msgid "Syncing %1..."
+msgstr "Szinkronizálás %1..."
+
+#: menus.lua:338
+msgid "Successfully synced %1"
+msgstr "Sikeresen szinkronizálva: %1"
+
+#: menus.lua:340
+msgid "Failed to sync %1"
+msgstr "Nem sikerült szinkronizálni: %1"
+
+#: menus.lua:343
+msgid "Could not open %1 for sync"
+msgstr "Nem lehet megnyitni szinkronizációhoz: %1"
+
+#: menus.lua:352
+msgid "Remove from list"
+msgstr "Eltávolítás a listából"
+
+#: menus.lua:355
+msgid "Removed %1 from sync list"
+msgstr "%1 eltávolítva a szinkronizációs listából"
+
+#: menus.lua:368
+msgid "Pending Documents"
+msgstr "Sorba állított dokumentumok"
+
+#: remote.lua:28
+msgid "Cloud Storage plugin is not enabled or available."
+msgstr "Felhőtárhely bővítmény nem engedélyezett vagy nem elérhető."
+
+#: remote.lua:46
+msgid "No cloud destination set in settings."
+msgstr "Nincs beállítva felhő cél a beállításokban."
+
+#: remote.lua:92
+msgid "Successfully synchronized."
+msgstr "Sikeresen szinkronizálva."
+
+#: settings_selection.lua:368
+msgid "No changed settings found."
+msgstr "Nem található módosított beállítás."
+
+#: settings_selection.lua:380
+msgid "Changed Settings"
+msgstr "Módosított beállítások"
