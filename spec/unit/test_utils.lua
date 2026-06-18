@@ -163,6 +163,7 @@ function M.mock_sync_service(SyncService)
         if not current_readerui.cloudstorage then
             current_readerui.cloudstorage = {}
         end
+        current_readerui.cloudstorage.is_mock = true
         current_readerui.cloudstorage.sync = function(self, server, file_path, sync_cb, is_silent, caller_pre_callback)
             return SyncService.sync(server, file_path, sync_cb)
         end
