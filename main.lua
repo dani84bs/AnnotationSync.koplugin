@@ -25,6 +25,7 @@ local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservi
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
 local jump_to_device_progress_description = "Jump to the reading progress of another device."
+local push_progress_description = "Push the reading progress of the active document to the cloud."
 
 local AnnotationSyncPlugin = WidgetContainer:extend {
     -- see also: _meta.lua
@@ -316,6 +317,17 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                 end
             },
             {
+                text = _("Push reading progress"),
+                enabled_func = function()
+                    return self.ui.cloudstorage ~= nil
+                        and ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "")
+                        and ((self.ui and self.ui.document) ~= nil)
+                end,
+                callback = function()
+                    self:onAnnotationSyncPushProgress()
+                end
+            },
+            {
                 text = _("Jump to device progress"),
                 enabled_func = function()
                     return self.ui.cloudstorage ~= nil
@@ -464,6 +476,27 @@ function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
     return true
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncPushProgress()
+    if not self.ui.cloudstorage then
+        utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
+        return true
+    end
+    local document = self.ui and self.ui.document
+    if not document or not document.file then
+        utils.show_msg(_("A document must be active to push reading progress."))
+        return true
+    end
+    utils.show_msg(_("Pushing reading progress..."))
+    self.manager:syncProgress(function(success)
+        if success then
+            utils.show_msg(_("Reading progress pushed successfully."))
+        else
+            utils.show_msg(_("Failed to push reading progress."))
+        end
+    end)
+    return true
+end
+
 function AnnotationSyncPlugin:onPageUpdate(page_pos)
     if self.manager then
         self.manager:onPageUpdate(page_pos)
@@ -518,6 +551,14 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         text = _("Pull the selected settings from the cloud."),
         separator = true,
         general = true
+    })
+    Dispatcher:registerAction("annotation_sync_push_progress", {
+        category = "none",
+        event = "AnnotationSyncPushProgress",
+        title = _("AnnotationSync: Push reading progress"),
+        text = _(push_progress_description),
+        separator = true,
+        reader = true
     })
     Dispatcher:registerAction("annotation_sync_jump_to_device_progress", {
         category = "none",

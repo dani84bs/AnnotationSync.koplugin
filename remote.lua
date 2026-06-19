@@ -52,47 +52,15 @@ local function perform_sync(widget, json_path, sync_cb, is_silent, on_complete)
     end
 end
 
-function M.is_async_sync(widget)
-    if widget.ui.cloudstorage and not widget.ui.cloudstorage.is_mock then
-        return true
-    end
-    return false
-end
-
 function M.sync_annotations(widget, document, json_path, on_complete, force)
-    local completed = false
-    local function on_complete_once(success, merged_list)
-        if not completed then
-            completed = true
-            if on_complete then
-                on_complete(success, merged_list)
-            end
-        end
-    end
-
     local sync_cb = function(local_file, cached_file, income_file)
         local success, merged_list = annotations.sync_callback(document, local_file, cached_file, income_file, force)
-        on_complete_once(success, merged_list)
+        if on_complete then
+            on_complete(success, merged_list)
+        end
         return success
     end
-
-    -- Timeout safety fallback for async sync (15 seconds)
-    if M.is_async_sync(widget) then
-        UIManager:scheduleIn(15, function()
-            if not completed then
-                local logger = require("logger")
-                logger.warn("AnnotationSync: sync timed out for " .. (document.file or "unknown"))
-                on_complete_once(false)
-            end
-        end)
-    end
-
-    perform_sync(widget, json_path, sync_cb, not force, on_complete_once)
-
-    -- If it was synchronous and callback was not called, it failed synchronously.
-    if not M.is_async_sync(widget) and not completed then
-        on_complete_once(false)
-    end
+    perform_sync(widget, json_path, sync_cb, not force, on_complete)
 end
 
 function M._sync_progress_callback(local_file, cached_file, income_file)

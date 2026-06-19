@@ -330,25 +330,21 @@ function M.show_pending_documents(plugin)
                         if document then
                             local is_temporary = (document ~= ui_document)
                             utils.show_msg(T(_("Syncing %1..."), clean_filename))
-                            plugin.manager:syncDocument(document, true, function(success)
-                                if is_temporary then
-                                    document:close()
-                                end
-                                if success then
-                                    utils.show_msg(T(_("Successfully synced %1"), clean_filename))
-                                else
-                                    utils.show_msg(T(_("Failed to sync %1"), clean_filename))
-                                end
-                                -- Close pending menu and reopen to refresh the list
-                                if pending_menu then UIManager:close(pending_menu) end
-                                M.show_pending_documents(plugin)
-                            end)
+                            local success = plugin.manager:syncDocument(document, true)
+                            if is_temporary then
+                                document:close()
+                            end
+                            if success then
+                                utils.show_msg(T(_("Successfully synced %1"), clean_filename))
+                            else
+                                utils.show_msg(T(_("Failed to sync %1"), clean_filename))
+                            end
                         else
                             utils.show_msg(T(_("Could not open %1 for sync"), clean_filename))
-                            -- Close pending menu and reopen to refresh the list
-                            if pending_menu then UIManager:close(pending_menu) end
-                            M.show_pending_documents(plugin)
                         end
+                        -- Close pending menu and reopen to refresh the list
+                        if pending_menu then UIManager:close(pending_menu) end
+                        M.show_pending_documents(plugin)
                     end,
                     other_buttons = {
                         {
