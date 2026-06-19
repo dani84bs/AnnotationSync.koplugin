@@ -847,6 +847,73 @@ describe("Reading Progress Sync Integration", function()
         _G.utils.show_msg = old_show_msg
     end)
 
+    it("handles onAnnotationSyncPushProgress events correctly", function()
+        local push_called = false
+        local push_callback
+        local old_sync_progress = sync_instance.manager.syncProgress
+        sync_instance.manager.syncProgress = function(this, cb)
+            push_called = true
+            push_callback = cb
+        end
+
+        local msg_shown
+        local old_show_msg = _G.utils.show_msg
+        _G.utils.show_msg = function(msg)
+            msg_shown = msg
+        end
+
+        -- Case 1: cloudstorage is missing/disabled
+        local old_cloudstorage = sync_instance.ui.cloudstorage
+        sync_instance.ui.cloudstorage = nil
+        
+        local res = sync_instance:onAnnotationSyncPushProgress()
+        assert.is_true(res)
+        assert.is_false(push_called)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("not supported") ~= nil)
+
+        -- Reset cloudstorage for other cases
+        sync_instance.ui.cloudstorage = old_cloudstorage
+        msg_shown = nil
+
+        -- Case 2: No active document
+        local old_document = sync_instance.ui.document
+        sync_instance.ui.document = nil
+
+        res = sync_instance:onAnnotationSyncPushProgress()
+        assert.is_true(res)
+        assert.is_false(push_called)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("A document must be active") ~= nil)
+
+        -- Reset document
+        sync_instance.ui.document = old_document
+        msg_shown = nil
+
+        -- Case 3: Successful push triggers push message, and invokes callback
+        res = sync_instance:onAnnotationSyncPushProgress()
+        assert.is_true(res)
+        assert.is_true(push_called)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("Pushing reading progress") ~= nil)
+        
+        -- Trigger callback with success=true
+        msg_shown = nil
+        push_callback(true)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("pushed successfully") ~= nil)
+
+        -- Trigger callback with success=false
+        msg_shown = nil
+        push_callback(false)
+        assert.is_not_nil(msg_shown)
+        assert.is_true(msg_shown:find("Failed to push") ~= nil)
+
+        -- Clean up mocks
+        sync_instance.manager.syncProgress = old_sync_progress
+        _G.utils.show_msg = old_show_msg
+    end)
+
     it("uses custom device name in progress.json when configured", function()
         local remote = require("remote")
         local old_push = remote.push_progress_bg
