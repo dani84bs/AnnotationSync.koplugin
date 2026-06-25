@@ -33,6 +33,7 @@ local AnnotationSyncPlugin = WidgetContainer:extend {
 
     settings = nil,
     manager = nil,
+    has_syncservice = has_syncservice,
 }
 
 AnnotationSyncPlugin.default_settings = {
@@ -140,14 +141,14 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     {
                         text = _("Cloud settings"),
                         enabled_func = function()
-                            return self.ui.cloudstorage ~= nil or has_syncservice
+                            return self.ui.cloudstorage ~= nil or self.has_syncservice
                         end,
                         callback = function()
                             if self.ui.cloudstorage then
                                 self.ui.cloudstorage:onShowCloudStorageList(function(server)
                                     self:onSyncServiceConfirm(server)
                                 end)
-                            elseif has_syncservice then
+                            elseif self.has_syncservice then
                                 local sync_service = SyncService:new {}
                                 sync_service.onConfirm = function(server)
                                     self:onSyncServiceConfirm(server)
@@ -294,21 +295,21 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Push settings to cloud"),
-                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                enabled = (self.settings.sync_server ~= nil),
                 callback = function()
                     self.manager:pushSettings()
                 end
             },
             {
                 text = _("Pull settings from cloud"),
-                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= ""),
+                enabled = (self.settings.sync_server ~= nil),
                 callback = function()
                     self.manager:pullSettings()
                 end
             },
             {
                 text = _("Manual Sync"),
-                enabled = ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "") and ((self.ui and self.ui.document) ~= nil),
+                enabled = (self.settings.sync_server ~= nil) and ((self.ui and self.ui.document) ~= nil),
                 hold_callback = function()
                     utils.show_msg(manual_sync_description)
                 end,
@@ -319,8 +320,8 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             {
                 text = _("Push reading progress"),
                 enabled_func = function()
-                    return self.ui.cloudstorage ~= nil
-                        and ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "")
+                    return (self.ui.cloudstorage ~= nil or self.has_syncservice)
+                        and (self.settings.sync_server ~= nil)
                         and ((self.ui and self.ui.document) ~= nil)
                 end,
                 callback = function()
@@ -330,8 +331,8 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             {
                 text = _("Jump to device progress"),
                 enabled_func = function()
-                    return self.ui.cloudstorage ~= nil
-                        and ((G_reader_settings:readSetting("cloud_download_dir") or "") ~= "")
+                    return (self.ui.cloudstorage ~= nil or self.has_syncservice)
+                        and (self.settings.sync_server ~= nil)
                         and ((self.ui and self.ui.document) ~= nil)
                 end,
                 callback = function()
@@ -382,7 +383,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
         }
     }
 
-    if self.ui.cloudstorage == nil then
+    if self.ui.cloudstorage == nil and not self.has_syncservice then
         table.insert(menu_items.annotation_sync_plugin.sub_item_table, {
             text = _("Why are some options greyed out?"),
             callback = function()
@@ -417,7 +418,7 @@ function AnnotationSyncPlugin:applySyncedAnnotations(document, merged_list)
         -- 1. Sort for UI consistency
         table.sort(merged_list, function(a, b)
             local cmp = annotations.compare_positions(a.page, b.page, document)
-            return (cmp or 0) > 0
+            return (cmp or 0) < 0
         end)
         -- 2. Update active widget state
         self.ui.annotation.annotations = merged_list
@@ -463,7 +464,7 @@ function AnnotationSyncPlugin:onAnnotationSyncPullSettings()
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
-    if not self.ui.cloudstorage then
+    if not self.ui.cloudstorage and not self.has_syncservice then
         utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
         return true
     end
@@ -477,7 +478,7 @@ function AnnotationSyncPlugin:onAnnotationSyncJumpToDeviceProgress()
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncPushProgress()
-    if not self.ui.cloudstorage then
+    if not self.ui.cloudstorage and not self.has_syncservice then
         utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
         return true
     end
@@ -652,7 +653,7 @@ function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)
-    if not annotations and type(annotations) == "table" then
+    if not annotations or type(annotations) ~= "table" then
         logger.warn("AnnotationSync: Document annotations modification detected, but could not process provided annotations payload (of type: " .. type(annotations) .. ")")
         return
     end

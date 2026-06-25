@@ -811,6 +811,8 @@ describe("Reading Progress Sync Integration", function()
         -- Case 1: cloudstorage is missing/disabled
         local old_cloudstorage = sync_instance.ui.cloudstorage
         sync_instance.ui.cloudstorage = nil
+        local old_has_syncservice = sync_instance.has_syncservice
+        sync_instance.has_syncservice = false
         
         local res = sync_instance:onAnnotationSyncJumpToDeviceProgress()
         assert.is_true(res)
@@ -820,6 +822,7 @@ describe("Reading Progress Sync Integration", function()
 
         -- Reset cloudstorage for other cases
         sync_instance.ui.cloudstorage = old_cloudstorage
+        sync_instance.has_syncservice = old_has_syncservice
         msg_shown = nil
 
         -- Case 2: No active document
@@ -865,6 +868,8 @@ describe("Reading Progress Sync Integration", function()
         -- Case 1: cloudstorage is missing/disabled
         local old_cloudstorage = sync_instance.ui.cloudstorage
         sync_instance.ui.cloudstorage = nil
+        local old_has_syncservice = sync_instance.has_syncservice
+        sync_instance.has_syncservice = false
         
         local res = sync_instance:onAnnotationSyncPushProgress()
         assert.is_true(res)
@@ -874,6 +879,7 @@ describe("Reading Progress Sync Integration", function()
 
         -- Reset cloudstorage for other cases
         sync_instance.ui.cloudstorage = old_cloudstorage
+        sync_instance.has_syncservice = old_has_syncservice
         msg_shown = nil
 
         -- Case 2: No active document

@@ -39,6 +39,7 @@ describe("AnnotationSync Backward Compatibility", function()
         -- 1. Ensure widget.ui.cloudstorage is nil
         local mock_widget = {
             ui = {}, -- no cloudstorage plugin
+            has_syncservice = true,
             settings = {
                 sync_server = { url = "http://mock-server", type = "webdav" }
             }
@@ -76,6 +77,7 @@ describe("AnnotationSync Backward Compatibility", function()
         -- 1. Remove cloudstorage from readerui
         readerui.cloudstorage = nil
         sync_instance.ui.cloudstorage = nil
+        sync_instance.has_syncservice = false
 
         -- 2. Generate menu items
         local menu_items = {}
@@ -109,6 +111,7 @@ describe("AnnotationSync Backward Compatibility", function()
         -- 1. Remove cloudstorage from readerui
         readerui.cloudstorage = nil
         sync_instance.ui.cloudstorage = nil
+        sync_instance.has_syncservice = true
 
         -- 2. Mock UIManager:show to intercept SyncService instance
         local opened_syncservice = false
@@ -149,6 +152,7 @@ describe("AnnotationSync Backward Compatibility", function()
         -- 1. Remove cloudstorage from readerui
         readerui.cloudstorage = nil
         sync_instance.ui.cloudstorage = nil
+        sync_instance.has_syncservice = false
 
         -- 2. Generate menu items
         local menu_items = {}

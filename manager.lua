@@ -38,7 +38,7 @@ function SyncManager:new(plugin)
 end
 
 function SyncManager:onPageUpdate(page_pos)
-    if not self.plugin.ui.cloudstorage or not self.plugin.settings.progress_sync then return end
+    if not (self.plugin.ui.cloudstorage or self.plugin.has_syncservice) or not self.plugin.settings.progress_sync then return end
     logger.dbg("AnnotationSync: onPageUpdate event received")
 
     local current_page = self.plugin.ui:getCurrentPage()
@@ -256,7 +256,7 @@ function SyncManager:syncProgress(on_complete)
 end
 
 function SyncManager:pullProgress()
-    if not self.plugin.ui.cloudstorage then
+    if not (self.plugin.ui.cloudstorage or self.plugin.has_syncservice) then
         utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
         return
     end
@@ -489,7 +489,7 @@ function SyncManager:getDeletedAnnotations(document)
 
     table.sort(deleted, function(a, b)
         local cmp = annotations.compare_positions(a.page, b.page, document)
-        return (cmp or 0) > 0
+        return (cmp or 0) < 0
     end)
 
     return deleted

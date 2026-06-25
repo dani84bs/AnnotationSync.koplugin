@@ -113,7 +113,7 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
             local local_p = local_v.pos0 or local_v.page
             local income_p = income_v.pos0 or income_v.page
             local cmp = M.compare_positions(local_p, income_p, document)
-            if (cmp or 0) > 0 then
+            if (cmp or 0) < 0 then
                 merged[local_k] = local_v
                 l = l + 1
             else
@@ -181,7 +181,7 @@ function M.get_deleted_annotations(local_map, last_uploaded_map, document, force
                     local_and_uploaded = true
                     break
                 end
-                if M.compare_positions(local_v.page, uploaded_v.page, document) < 0 then
+                if M.compare_positions(local_v.page, uploaded_v.page, document) > 0 then
                     break
                 end
             end
@@ -198,13 +198,17 @@ end
 function M.compare_positions(a, b, document)
     if not a or not b then return 0 end
     if type(a) == "number" and type(b) == "number" then
-        return b - a
+        if a < b then return -1 end
+        if a > b then return 1 end
+        return 0
     end
     if type(a) == "string" and type(b) == "string" then
-        return document:compareXPointers(a, b) or 0
+        local cmp = document:compareXPointers(a, b)
+        return cmp and -cmp or 0
     end
     if type(a) == "table" and type(b) == "table" then
-        return document:comparePositions(a, b) or 0
+        local cmp = document:comparePositions(a, b)
+        return cmp and -cmp or 0
     end
     -- Fallback for mixed types
     return 0
@@ -282,7 +286,7 @@ function M.sort_keys_by_position(t, document)
         local pos_a = ann_a.pos0 or ann_a.page
         local pos_b = ann_b.pos0 or ann_b.page
         local cmp = M.compare_positions(pos_a, pos_b, document)
-        return (cmp or 0) > 0
+        return (cmp or 0) < 0
     end)
     return keys
 end
@@ -300,13 +304,18 @@ function M.positions_intersect(a, b, document)
         return false
     end
 
+    local c1 = M.compare_positions(a.pos0, b.pos0, document)
+    local c2 = M.compare_positions(b.pos0, a.pos1, document)
+    local c3 = M.compare_positions(b.pos0, a.pos0, document)
+    local c4 = M.compare_positions(a.pos0, b.pos1, document)
+
     -- A_Start <= B_Start <= A_End
-    if M.compare_positions(a.pos0, b.pos0, document) >= 0 and M.compare_positions(b.pos0, a.pos1, document) >= 0 then
+    if c1 <= 0 and c2 <= 0 then
         return true
     end
 
     -- B_Start <= A_Start <= B_End
-    if M.compare_positions(b.pos0, a.pos0, document) >= 0 and M.compare_positions(a.pos0, b.pos1, document) >= 0 then
+    if c3 <= 0 and c4 <= 0 then
         return true
     end
 
