@@ -103,7 +103,8 @@ function M.show_jump_menu(plugin, progress_map)
             text = text,
             sub_text = dev.data.timestamp,
             callback = function()
-                if dev.data.pos then
+                local target_page = dev.data.page or 1
+                if dev.data.pos and type(dev.data.pos) == "string" then
                     if plugin.ui.link then
                         plugin.ui.link:onGotoLink({ xpointer = dev.data.pos })
                     else
@@ -111,10 +112,10 @@ function M.show_jump_menu(plugin, progress_map)
                         UIManager:broadcastEvent(Event:new("GotoPos", dev.data.pos))
                     end
                 else
-                    plugin.ui:handleEvent(Event:new("GotoPage", dev.data.page))
-                    UIManager:broadcastEvent(Event:new("JumpToPage", dev.data.page))
+                    plugin.ui:handleEvent(Event:new("GotoPage", target_page))
+                    UIManager:broadcastEvent(Event:new("JumpToPage", target_page))
                 end
-                utils.show_msg(T(_("Jumped to page %1 from %2"), dev.data.page, dev.id))
+                utils.show_msg(T(_("Jumped to page %1 from %2"), target_page, dev.id))
                 UIManager:close(jump_menu)
             end
         })
