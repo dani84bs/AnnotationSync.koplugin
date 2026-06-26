@@ -295,21 +295,27 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Push settings to cloud"),
-                enabled = (self.settings.sync_server ~= nil),
+                enabled_func = function()
+                    return self.settings.sync_server ~= nil
+                end,
                 callback = function()
                     self.manager:pushSettings()
                 end
             },
             {
                 text = _("Pull settings from cloud"),
-                enabled = (self.settings.sync_server ~= nil),
+                enabled_func = function()
+                    return self.settings.sync_server ~= nil
+                end,
                 callback = function()
                     self.manager:pullSettings()
                 end
             },
             {
                 text = _("Manual Sync"),
-                enabled = (self.settings.sync_server ~= nil) and ((self.ui and self.ui.document) ~= nil),
+                enabled_func = function()
+                    return (self.settings.sync_server ~= nil) and ((self.ui and self.ui.document) ~= nil)
+                end,
                 hold_callback = function()
                     utils.show_msg(manual_sync_description)
                 end,
@@ -341,7 +347,9 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Sync All"),
-                enabled = true,
+                enabled_func = function()
+                    return self.settings.sync_server ~= nil
+                end,
                 hold_callback = function()
                     utils.show_msg(sync_all_description)
                 end,
@@ -359,7 +367,9 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
             },
             {
                 text = _("Show Deleted"),
-                enabled = ((self.ui and self.ui.document) ~= nil),
+                enabled_func = function()
+                    return (self.ui and self.ui.document) ~= nil
+                end,
                 callback = function()
                     self:showDeletedAnnotations()
                 end,
@@ -434,6 +444,13 @@ function AnnotationSyncPlugin:applySyncedAnnotations(document, merged_list)
             document:render()
             self.ui.view:recalculate()
             UIManager:setDirty(self.ui.view.dialog, "partial")
+        else
+            if document.resetTileCacheValidity then
+                document:resetTileCacheValidity()
+            end
+            if self.ui.view and self.ui.view.dialog then
+                UIManager:setDirty(self.ui.view.dialog, "ui")
+            end
         end
     else
         -- Update sidecar directly for inactive document
