@@ -298,28 +298,82 @@ function SyncManager:syncAllChangedDocuments()
         utils.show_msg("No changed documents to sync.")
         return
     end
+
+    local file_list = {}
+    for file, _ in pairs(changed_docs) do
+        table.insert(file_list, file)
+    end
+
     local count = 0
     local failed_files = {}
     local ui_document = self.plugin.ui and self.plugin.ui.document
-    for file, _ in pairs(changed_docs) do
-        -- Try to get a document object for this file, open if needed
+
+    local function processNext(index)
+        if index > #file_list then
+            -- All files processed
+            if count == 0 then
+                utils.show_msg("Unable to sync modified documents: " .. total)
+            else
+                self:updateLastSync("Sync All")
+                utils.show_msg("Successfully synced modified documents: " .. count)
+            end
+
+            if #failed_files > 0 then
+                local filenames = {}
+                for _, file in ipairs(failed_files) do
+                    table.insert(filenames, file:match("([^/]+)$") or file)
+                end
+                local ConfirmBox = require("ui/widget/confirmbox")
+                local list_str = "- " .. table.concat(filenames, "\n- ")
+                UIManager:nextTick(function()
+                    UIManager:show(ConfirmBox:new{
+                        text = T(_("Unable to sync the following document(s):\n%1\n\nWould you like to open the pending documents manager?"), list_str),
+                        type = "yesno",
+                        ok_text = _("Open Manager"),
+                        ok_callback = function()
+                            menus.show_pending_documents(self.plugin)
+                        end,
+                        cancel_text = _("Close"),
+                    })
+                end)
+            end
+            return
+        end
+
+        local file = file_list[index]
         local document = self:getDocumentByFile(file)
         if document then
             logger.info("AnnotationSync: syncing document: " .. file)
             local is_temporary = (document ~= ui_document)
-            local ok, success = pcall(self.syncDocument, self, document, false)
-            if ok and success then
-                count = count + 1
-            else
-                if not ok then
-                    logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(success))
+
+            local callback_called = false
+            local function on_sync_complete(success)
+                if callback_called then return end
+                callback_called = true
+
+                if success then
+                    count = count + 1
+                else
+                    table.insert(failed_files, file)
                 end
-                table.insert(failed_files, file)
+
+                if is_temporary then
+                    logger.info("AnnotationSync: closing temporary document: " .. file)
+                    document:close()
+                end
+
+                processNext(index + 1)
             end
 
-            if is_temporary then
-                logger.info("AnnotationSync: closing temporary document: " .. file)
-                document:close()
+            local ok, err = pcall(function()
+                self:syncDocument(document, false, on_sync_complete)
+            end)
+
+            if not ok then
+                logger.warn("AnnotationSync: syncDocument CRASHED for " .. file .. ": " .. tostring(err))
+                if not callback_called then
+                    on_sync_complete(false)
+                end
             end
         else
             -- Check if file still exists
@@ -330,52 +384,38 @@ function SyncManager:syncAllChangedDocuments()
                 logger.warn("AnnotationSync: could not open document for sync: " .. file)
                 table.insert(failed_files, file)
             end
+            processNext(index + 1)
         end
-    end
-    if count == 0 then
-        utils.show_msg("Unable to sync modified documents: " .. total)
-    else
-        self:updateLastSync("Sync All")
-        utils.show_msg("Successfully synced modified documents: " .. count)
     end
 
-    if #failed_files > 0 then
-        local filenames = {}
-        for _, file in ipairs(failed_files) do
-            table.insert(filenames, file:match("([^/]+)$") or file)
-        end
-        local ConfirmBox = require("ui/widget/confirmbox")
-        local list_str = "- " .. table.concat(filenames, "\n- ")
-        UIManager:nextTick(function()
-            UIManager:show(ConfirmBox:new{
-                text = T(_("Unable to sync the following document(s):\n%1\n\nWould you like to open the pending documents manager?"), list_str),
-                type = "yesno",
-                ok_text = _("Open Manager"),
-                ok_callback = function()
-                    menus.show_pending_documents(self.plugin)
-                end,
-                cancel_text = _("Close"),
-            })
-        end)
-    end
+    processNext(1)
 end
 
 -- Orchestrates the sync process for a single document
-function SyncManager:syncDocument(document, is_manual)
+function SyncManager:syncDocument(document, is_manual, on_complete)
     local file = document and document.file
-    if not file then return false end
+    if not file then
+        if on_complete then on_complete(false) end
+        return false
+    end
 
     self:_flushSettings()
     logger.dbg("AnnotationSync: syncing document: " .. file)
 
     local json_path = self:writeAnnotationsJSON(document)
-    if not json_path then return false end
+    if not json_path then
+        if on_complete then on_complete(false) end
+        return false
+    end
 
     logger.dbg("AnnotationSync: remote sync of " .. json_path .. " (force=" .. tostring(is_manual) .. ")")
     local sync_success = false
     remote.sync_annotations(self.plugin, document, json_path, function(success, merged_list)
         sync_success = success
         self:_onSyncComplete(document, success, merged_list)
+        if on_complete then
+            on_complete(success, merged_list)
+        end
     end, is_manual)
     return sync_success
 end
