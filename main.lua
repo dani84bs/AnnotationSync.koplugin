@@ -45,6 +45,7 @@ AnnotationSyncPlugin.default_settings = {
     progress_sync_last_word = false,
     device_name = "",
     selected_settings = {},
+    progress_sync_excluded_dirs = {},
 }
 
 function AnnotationSyncPlugin:init()
@@ -83,6 +84,7 @@ function AnnotationSyncPlugin:init()
     if type(self.settings.progress_sync_interval) ~= "number" then
         self.settings.progress_sync_interval = self.default_settings.progress_sync_interval
     end
+    self.settings.progress_sync_excluded_dirs = self.settings.progress_sync_excluded_dirs or {}
 
     self.manager = SyncManager:new(self)
 
@@ -236,6 +238,15 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                                 end
                             }
                             UIManager:show(input)
+                        end,
+                    },
+                    {
+                        text = _("Manage excluded directories (progress sync)"),
+                        enabled_func = function()
+                            return (self.ui.cloudstorage ~= nil or self.has_syncservice) and self.settings.progress_sync
+                        end,
+                        callback = function()
+                            require("exclude_dirs").show(self)
                         end,
                     },
                     {
