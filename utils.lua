@@ -54,6 +54,27 @@ function M.show_msg(msg)
     })
 end
 
+local function strip_trailing_slash(path)
+    if path ~= "/" then
+        path = path:gsub("/+$", "")
+    end
+    return path
+end
+
+function M.is_path_excluded(dir, excluded_dirs)
+    if not dir or not excluded_dirs then return false end
+    dir = strip_trailing_slash(dir)
+    for _, excluded in ipairs(excluded_dirs) do
+        excluded = strip_trailing_slash(excluded)
+        if excluded == "/" then
+            if dir:sub(1, 1) == "/" then return true end
+        elseif dir == excluded or dir:sub(1, #excluded + 1) == excluded .. "/" then
+            return true
+        end
+    end
+    return false
+end
+
 function M.get_nested_value(tbl, path_str)
     if not tbl then return nil end
     local parts = {}

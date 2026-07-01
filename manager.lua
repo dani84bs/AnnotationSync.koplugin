@@ -6,7 +6,8 @@ local util = require("util")
 local logger = require("logger")
 local json = require("json")
 local _ = require("gettext")
-local T = require("ffi/util").template
+local ffiUtil = require("ffi/util")
+local T = ffiUtil.template
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
 local Event = require("ui/event")
@@ -39,6 +40,13 @@ end
 
 function SyncManager:onPageUpdate(page_pos)
     if not (self.plugin.ui.cloudstorage or self.plugin.has_syncservice) or not self.plugin.settings.progress_sync then return end
+
+    local document = self.plugin.ui.document
+    if document and document.file then
+        local dir = ffiUtil.dirname(document.file)
+        if utils.is_path_excluded(dir, self.plugin.settings.progress_sync_excluded_dirs) then return end
+    end
+
     logger.dbg("AnnotationSync: onPageUpdate event received")
 
     local current_page = self.plugin.ui:getCurrentPage()
