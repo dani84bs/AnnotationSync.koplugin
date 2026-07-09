@@ -172,29 +172,49 @@ function M.get_deleted_annotations(local_map, last_uploaded_map, document, force
             return
         end
 
+        -- `l` is a persistent floor: local entries before it have been proven
+        -- to end strictly before the CURRENT uploaded entry's start, so they
+        -- can never match this or any later (higher-sorted) uploaded entry
+        -- either, and are permanently skipped. Matches never advance `l`, so
+        -- a single wide local annotation can still satisfy several uploaded
+        -- entries (Issue #69).
+        --
+        -- For each uploaded entry, `j` walks forward from `l` looking for a
+        -- match. Crucially this uses the fine-grained pos0/pos1 range (via
+        -- compare_positions), not the coarse `.page` number: two distinct
+        -- highlights routinely share the same PDF page number, which made
+        -- the old page-only check tie (0) on the very first non-matching
+        -- same-page candidate and give up immediately, wrongly marking every
+        -- later same-page uploaded entry as deleted (Issue #87).
         local l = 1
         for _, uploaded_k in ipairs(uploaded_keys) do
             local uploaded_v = last_uploaded_map[uploaded_k]
+            local uploaded_start = uploaded_v.pos0 or uploaded_v.page
             local local_and_uploaded = false
-            while l <= #local_keys do
-                local local_v = local_map[local_keys[l]]
+            local j = l
+            while j <= #local_keys do
+                local local_v = local_map[local_keys[j]]
                 if M.positions_intersect(uploaded_v, local_v, document) then
                     local_and_uploaded = true
                     break
                 end
-                -- Only permanently skip local_v when it's STRICTLY before
-                -- uploaded_v (compare < 0). A tie (0) is ambiguous: it may mean
-                -- "same position", but compare_positions also collapses an
-                -- unresolvable/invalid XPointer comparison (nil from
-                -- document:compareXPointers, e.g. a stale annotation position)
-                -- into 0. Treating that as "safe to discard" could silently
-                -- mark a still-present annotation as deleted, so ties fall
-                -- through to break instead, keeping local_v available for
-                -- re-examination against the next uploaded entry.
-                if M.compare_positions(local_v.page, uploaded_v.page, document) >= 0 then
+                -- Only permanently discard local_v when it's STRICTLY before
+                -- uploaded_v's start (compare < 0). A tie (0) is ambiguous: it
+                -- may mean "same position", but compare_positions also
+                -- collapses an unresolvable/invalid XPointer comparison (nil
+                -- from document:compareXPointers, e.g. a stale annotation
+                -- position) into 0. Treating that as "safe to discard" could
+                -- silently mark a still-present annotation as deleted, so
+                -- ties fall through to stop the lookahead instead, keeping
+                -- local_v available for re-examination against later
+                -- uploaded entries.
+                local local_end = local_v.pos1 or local_v.page
+                if M.compare_positions(local_end, uploaded_start, document) < 0 then
+                    j = j + 1
+                    l = j
+                else
                     break
                 end
-                l = l + 1
             end
             if not local_and_uploaded then
                 uploaded_v.deleted = true
