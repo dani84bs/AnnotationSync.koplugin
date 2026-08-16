@@ -34,7 +34,8 @@ function M.mock_image_viewer()
     return old_new
 end
 
-function M.init_integration_context(file, AnnotationSyncPlugin)
+function M.init_integration_context(file, AnnotationSyncPlugin, opts)
+    opts = opts or {}
     local readerui = ReaderUI:new{
         dimen = Geom:new{ w = 1200, h = 1600 },
         document = DocumentRegistry:openDocument(file),
@@ -75,9 +76,11 @@ function M.init_integration_context(file, AnnotationSyncPlugin)
     end
 
     -- Automatically mock cloudstorage if SyncService is available
-    local ok, SyncService = pcall(require, "apps/cloudstorage/syncservice")
-    if ok then
-        M.mock_sync_service(SyncService)
+    if not opts.skip_sync_mock then
+        local ok, SyncService = pcall(require, "apps/cloudstorage/syncservice")
+        if ok then
+            M.mock_sync_service(SyncService)
+        end
     end
 
     -- Hook the plugin into readerui to receive events
