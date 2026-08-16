@@ -225,6 +225,25 @@ Koofr is a cloud storage provider that supports WebDAV. Connecting KOReader to K
 
 The project includes a comprehensive integration test suite. To run it, you need a KOReader development environment (`kodev`).
 
+### Setting up a KOReader dev environment from scratch
+
+If you don't already have a built `koreader` checkout, or you're on a bare Debian/Ubuntu container without the toolchain:
+
+1. **Plugin location**: `run_tests.sh` and the manual steps below assume this plugin lives at `<koreader>/plugins/AnnotationSync.koplugin`. If you've checked this repo out elsewhere, symlink it in rather than moving it:
+   ```bash
+   ln -s /path/to/AnnotationSync.koplugin /path/to/koreader/plugins/AnnotationSync.koplugin
+   ```
+2. **System packages**: install a C/C++ toolchain plus `cmake`, `ninja-build`, `ccache`, `luarocks`, and **`meson`** (easy to miss — `koreader/base`'s CMake config fails with `Could not find Meson` without it; the official CI image has it preinstalled, so this step is invisible there). On Debian/Ubuntu, also install the SDL3 build deps listed in `.github/workflows/test.yml` (`libx11-dev`, `libwayland-dev`, `libasound2-dev`, etc.) if the emulator build fails to find them.
+3. **Init and build the `base` submodule** (this is the only submodule the test suite needs — no full `kodev build` required):
+   ```bash
+   cd /path/to/koreader
+   git submodule update --init --recursive base
+   make fetchthirdparty
+   make base
+   ```
+   This compiles koreader-base's thirdparty C deps (mupdf, SDL3, sqlite, busted, …) — expect a long first run with no build cache.
+4. Now run the automated script below.
+
 ### Automated script
 
 ```bash
