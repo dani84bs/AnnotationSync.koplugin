@@ -47,4 +47,26 @@ function M.init_real_remote_context(file, AnnotationSyncPlugin)
     return readerui, sync_instance
 end
 
+-- Seeds the real WebDAV server with an annotation map for `file`, at the
+-- same path SyncService.sync will download from -- simulating a prior
+-- sync from another device without actually running a second device.
+function M.seed_remote_annotations(sync_instance, file, data, test_data_dir)
+    local WebDavApi = require("apps/cloudstorage/webdavapi")
+    local server = M.server_config()
+    local file_name = sync_instance.manager:_getAnnotationFilename(file)
+    local remote_path = WebDavApi:getJoinedPath(server.address, server.url)
+    remote_path = WebDavApi:getJoinedPath(remote_path, file_name)
+
+    local tmp_path = test_data_dir .. "/.seed_remote.json"
+    local encoded = json.encode(data)
+    if encoded == "[]" then encoded = "{}" end
+    local f = io.open(tmp_path, "w")
+    f:write(encoded)
+    f:close()
+
+    local code = WebDavApi:uploadFile(remote_path, server.username, server.password, tmp_path)
+    os.remove(tmp_path)
+    return code
+end
+
 return M
