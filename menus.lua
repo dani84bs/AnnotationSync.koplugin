@@ -7,6 +7,7 @@ local T = require("ffi/util").template
 local utils = require("utils")
 local annotations = require("annotations")
 local changed_documents = require("changed_documents")
+local settings_sync = require("settings_sync")
 
 local M = {}
 
@@ -174,17 +175,6 @@ function M.show_devices_menu(plugin, settings_map)
     UIManager:show(devices_menu)
 end
 
-local function values_differ(v1, v2)
-    if type(v1) ~= type(v2) then
-        return true
-    end
-    if type(v1) == "table" then
-        local json = require("json")
-        return json.encode(v1) ~= json.encode(v2)
-    end
-    return v1 ~= v2
-end
-
 function M.show_differing_settings_menu(plugin, device_name, remote_settings, parent_menu)
     local menu_items = {}
     local diff_menu
@@ -193,8 +183,8 @@ function M.show_differing_settings_menu(plugin, device_name, remote_settings, pa
     local differing = {}
     local caches = {}
     for key, r_val in pairs(remote_settings) do
-        local l_val = plugin.manager:getLocalSettingValue(key, caches)
-        if values_differ(l_val, r_val) then
+        local l_val = settings_sync.get_local_value(key, caches)
+        if settings_sync.values_differ(l_val, r_val) then
             -- Format values for display
             local function format_val(val)
                 if val == nil then return "nil" end
@@ -235,13 +225,13 @@ function M.show_differing_settings_menu(plugin, device_name, remote_settings, pa
             local count = 0
             for _, diff in ipairs(differing) do
                 if checked[diff.key] then
-                    if plugin.manager:writeLocalSettingValue(diff.key, diff.remote_val) then
+                    if settings_sync.write_local_value(diff.key, diff.remote_val) then
                         count = count + 1
                     end
                 end
             end
             if count > 0 then
-                plugin.manager:_flushSettings()
+                utils.flush_settings()
                 utils.show_msg(T(_("Successfully imported %1 settings."), count))
             else
                 utils.show_msg(_("No settings imported."))

@@ -17,6 +17,7 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 local changed_documents = require("changed_documents")
+local settings_sync = require("settings_sync")
 local SyncManager = require("manager")
 local SettingsSelection = require("settings_selection")
 local menus = require("menus")
@@ -345,7 +346,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     return self.settings.sync_server ~= nil
                 end,
                 callback = function()
-                    self.manager:pushSettings()
+                    settings_sync.push(self)
                 end
             },
             {
@@ -354,7 +355,7 @@ function AnnotationSyncPlugin:addToMainMenu(menu_items)
                     return self.settings.sync_server ~= nil
                 end,
                 callback = function()
-                    self.manager:pullSettings()
+                    settings_sync.pull(self)
                 end
             },
             {
@@ -517,12 +518,12 @@ function AnnotationSyncPlugin:onAnnotationSyncManualSync()
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncPushSettings()
-    self.manager:pushSettings()
+    settings_sync.push(self)
     return true
 end
 
 function AnnotationSyncPlugin:onAnnotationSyncPullSettings()
-    self.manager:pullSettings()
+    settings_sync.pull(self)
     return true
 end
 

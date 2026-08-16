@@ -1,5 +1,5 @@
 describe("AnnotationSync Settings Synchronization", function()
-    local UIManager, AnnotationSyncPlugin, test_utils, json, util
+    local UIManager, AnnotationSyncPlugin, test_utils, json, util, settings_sync
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_settings_sync_tmp"
     local old_getDataDir
@@ -8,13 +8,14 @@ describe("AnnotationSync Settings Synchronization", function()
         require("commonrequire")
         local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
         package.path = plugin_path .. ";" .. package.path
-        
+
         disable_plugins()
         UIManager = require("ui/uimanager")
         json = require("json")
         util = require("util")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        settings_sync = require("settings_sync")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
     end)
@@ -37,7 +38,7 @@ describe("AnnotationSync Settings Synchronization", function()
 
     it("should return nil from getSelectedSettingsWithValues when selected_settings is empty", function()
         sync_instance.settings.selected_settings = {}
-        local res = sync_instance.manager:getSelectedSettingsWithValues()
+        local res = settings_sync.get_selected_with_values(sync_instance)
         assert.is_nil(res)
     end)
 
@@ -60,7 +61,7 @@ return {
             ["reader:footer.time"] = true
         }
 
-        local values = sync_instance.manager:getSelectedSettingsWithValues()
+        local values = settings_sync.get_selected_with_values(sync_instance)
         assert.is_not_nil(values)
         assert.is_equal(120, values["reader:auto_standby_timeout_seconds"])
         assert.is_equal(true, values["reader:footer.time"])
@@ -122,7 +123,7 @@ return {
             return true
         end
 
-        sync_instance.manager:pushSettings()
+        settings_sync.push(sync_instance)
         assert.is_true(sync_called)
 
         -- Restore mock
@@ -208,7 +209,7 @@ return {
             end
         end
 
-        sync_instance.manager:pullSettings()
+        settings_sync.pull(sync_instance)
         assert.is_true(sync_called)
         assert.is_equal(2, show_called_count)
 

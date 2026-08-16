@@ -1,5 +1,4 @@
 local DocumentRegistry = require("document/documentregistry")
-local DataStorage = require("datastorage")
 local NetworkMgr = require("ui/network/manager")
 local util = require("util")
 local logger = require("logger")
@@ -9,7 +8,6 @@ local ffiUtil = require("ffi/util")
 local T = ffiUtil.template
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
-local Event = require("ui/event")
 local lfs = require("libs/libkoreader-lfs")
 
 local annotations = require("annotations")
@@ -400,7 +398,7 @@ function SyncManager:syncDocument(document, is_manual, on_complete)
         return false
     end
 
-    self:_flushSettings()
+    utils.flush_settings()
     logger.dbg("AnnotationSync: syncing document: " .. file)
 
     local json_path = self:writeAnnotationsJSON(document)
@@ -518,10 +516,6 @@ function SyncManager:updateLastSync(descriptor)
     logger.dbg("AnnotationSync: updateLastSync: updated at " .. self.plugin.settings.last_sync)
 end
 
-function SyncManager:_flushSettings()
-    UIManager:broadcastEvent(Event:new("FlushSettings"))
-end
-
 function SyncManager:_getAnnotationFilename(file)
     if self.plugin.settings.use_filename then
         local filename = file:match("([^/]+)$") or file
@@ -551,219 +545,5 @@ function SyncManager:_onSyncComplete(document, success, merged_list)
     end
 end
 
-function SyncManager:getSelectedSettingsWithValues()
-    local selected = self.plugin.settings.selected_settings or {}
-    local has_any = false
-    for _, _ in pairs(selected) do
-        has_any = true
-        break
-    end
-    if not has_any then
-        return nil
-    end
-
-    -- Load active reader settings
-    local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
-    local ok_a, active_reader = pcall(dofile, active_reader_path)
-    if not ok_a or type(active_reader) ~= "table" then
-        active_reader = {}
-    end
-
-    -- Load active defaults settings
-    local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
-    local ok_ad, active_defaults = pcall(dofile, active_defaults_path)
-    if not ok_ad or type(active_defaults) ~= "table" then
-        active_defaults = {}
-    end
-
-    -- Cache for loaded settings files in settings/ directory
-    local settings_cache = {}
-
-    local result = {}
-    for key, is_selected in pairs(selected) do
-        if is_selected then
-            local domain, full_key = key:match("^([^:]+):(.*)$")
-            if domain and full_key then
-                local val
-                if domain == "reader" then
-                    val = utils.get_nested_value(active_reader, full_key)
-                elseif domain == "defaults" then
-                    val = utils.get_nested_value(active_defaults, full_key)
-                elseif domain:match("^settings/") then
-                    local settings_name = domain:sub(10)
-                    if settings_cache[settings_name] == nil then
-                        local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
-                        local ok_s, a_tbl = pcall(dofile, filepath)
-                        if ok_s and type(a_tbl) == "table" then
-                            settings_cache[settings_name] = a_tbl
-                        else
-                            settings_cache[settings_name] = false
-                        end
-                    end
-                    local tbl = settings_cache[settings_name]
-                    if tbl then
-                        val = utils.get_nested_value(tbl, full_key)
-                    end
-                end
-                result[key] = val
-            end
-        end
-    end
-
-    return result
-end
-
-function SyncManager:pushSettings()
-    local selected_values = self:getSelectedSettingsWithValues()
-    if not selected_values then
-        utils.show_msg(_("No settings are selected. Please select settings to sync in 'Show changed settings'."))
-        return
-    end
-
-    local device_id = utils.get_device_name(self.plugin)
-    local local_data = {
-        [device_id] = {
-            settings = selected_values,
-            timestamp = os.date("%Y-%m-%d %H:%M:%S"),
-        }
-    }
-
-    local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
-    local ok, err = util.writeToFile(json.encode(local_data), json_path, true, false, true)
-    if not ok then
-        logger.warn("AnnotationSync: failed to write settings JSON: " .. json_path .. " (" .. tostring(err) .. ")")
-        utils.show_msg(_("Failed to write settings to local storage."))
-        return
-    end
-
-    logger.dbg("AnnotationSync: pushing settings to remote: " .. json_path)
-    utils.show_msg(_("Pushing settings to cloud..."))
-    remote.sync_settings(self.plugin, json_path, function(success)
-        if success then
-            logger.dbg("AnnotationSync: settings push successful")
-        else
-            logger.warn("AnnotationSync: settings push failed")
-        end
-    end)
-end
-
-local function values_differ(v1, v2)
-    if type(v1) ~= type(v2) then
-        return true
-    end
-    if type(v1) == "table" then
-        return json.encode(v1) ~= json.encode(v2)
-    end
-    return v1 ~= v2
-end
-
-function SyncManager:getLocalSettingValue(key, caches)
-    caches = caches or {}
-    local domain, full_key = key:match("^([^:]+):(.*)$")
-    if not domain or not full_key then return nil end
-
-    if domain == "reader" then
-        if caches.reader == nil then
-            local active_reader_path = DataStorage:getDataDir() .. "/settings.reader.lua"
-            local ok, active_reader = pcall(dofile, active_reader_path)
-            caches.reader = ok and active_reader or {}
-        end
-        return utils.get_nested_value(caches.reader, full_key)
-    elseif domain == "defaults" then
-        if caches.defaults == nil then
-            local active_defaults_path = DataStorage:getDataDir() .. "/defaults.custom.lua"
-            local ok, active_defaults = pcall(dofile, active_defaults_path)
-            caches.defaults = ok and active_defaults or {}
-        end
-        return utils.get_nested_value(caches.defaults, full_key)
-    elseif domain:match("^settings/") then
-        local settings_name = domain:sub(10)
-        if caches[settings_name] == nil then
-            local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
-            local ok, a_tbl = pcall(dofile, filepath)
-            caches[settings_name] = ok and a_tbl or false
-        end
-        local tbl = caches[settings_name]
-        if tbl then
-            return utils.get_nested_value(tbl, full_key)
-        end
-    end
-    return nil
-end
-
-local function save_nested_setting(settings_obj, parts, value)
-    if #parts == 1 then
-        settings_obj:saveSetting(parts[1], value)
-    else
-        local top_key = parts[1]
-        local top_val = settings_obj:readSetting(top_key)
-        if type(top_val) ~= "table" then
-            top_val = {}
-        end
-        local new_tbl = util.tableDeepCopy(top_val)
-        local current = new_tbl
-        for i = 2, #parts - 1 do
-            local part = parts[i]
-            if type(current[part]) ~= "table" then
-                current[part] = {}
-            end
-            current = current[part]
-        end
-        current[parts[#parts]] = value
-        settings_obj:saveSetting(top_key, new_tbl)
-    end
-    settings_obj:flush()
-end
-
-function SyncManager:writeLocalSettingValue(key, value)
-    local domain, full_key = key:match("^([^:]+):(.*)$")
-    if not domain or not full_key then return false end
-
-    local LuaSettings = require("luasettings")
-    local parts = {}
-    for part in string.gmatch(full_key, "([^%.]+)") do
-        table.insert(parts, part)
-    end
-
-    if domain == "reader" then
-        save_nested_setting(G_reader_settings, parts, value)
-
-        local filepath = DataStorage:getDataDir() .. "/settings.reader.lua"
-        local settings_obj = LuaSettings:open(filepath)
-        save_nested_setting(settings_obj, parts, value)
-        return true
-    elseif domain == "defaults" then
-        local filepath = DataStorage:getDataDir() .. "/defaults.custom.lua"
-        local settings_obj = LuaSettings:open(filepath)
-        save_nested_setting(settings_obj, parts, value)
-        return true
-    elseif domain:match("^settings/") then
-        local settings_name = domain:sub(10)
-        local filepath = DataStorage:getSettingsDir() .. "/" .. settings_name .. ".lua"
-        local settings_obj = LuaSettings:open(filepath)
-        save_nested_setting(settings_obj, parts, value)
-        return true
-    end
-    return false
-end
-
-
-function SyncManager:pullSettings()
-    if not NetworkMgr:isConnected() then
-        utils.show_msg(_("Network is disconnected, cannot pull settings"))
-        return
-    end
-
-    local json_path = DataStorage:getDataDir() .. "/settings_sync.json"
-    
-    utils.show_msg(_("Fetching settings from cloud..."))
-    remote.sync_settings(self.plugin, json_path, function(success, merged_data)
-        if success and merged_data then
-            menus.show_devices_menu(self.plugin, merged_data)
-        else
-            utils.show_msg(_("Failed to fetch settings from cloud"))
-        end
-    end)
-end
 
 return SyncManager

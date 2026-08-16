@@ -3,8 +3,13 @@ local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
 local json = require("json")
 local Device = require("device")
+local Event = require("ui/event")
 
 local M = {}
+
+function M.flush_settings()
+    UIManager:broadcastEvent(Event:new("FlushSettings"))
+end
 
 function M.read_json(path)
     local f = io.open(path, "r")
