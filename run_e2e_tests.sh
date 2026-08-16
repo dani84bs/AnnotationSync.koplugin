@@ -25,10 +25,13 @@ SPEC_DST_DIR="$KO_DIR/spec/unit"
 # Automatically detect all .lua files in the plugin e2e spec directory
 FILES=($(cd "$PLUGIN_SPEC_DIR" && ls *.lua))
 
-# Derive test names from files ending in _spec.lua
+# Derive test names from files ending in _spec.lua, excluding two-device
+# driver specs: those are only ever launched as their own OS process by
+# two_device_harness.lua (see the *_two_device_spec.lua orchestrators),
+# never run directly as part of this batch.
 TEST_NAMES=()
 for file in "${FILES[@]}"; do
-    if [[ "$file" == *_spec.lua ]]; then
+    if [[ "$file" == *_spec.lua && "$file" != *_two_device_driver_*_spec.lua ]]; then
         TEST_NAMES+=("${file%_spec.lua}")
     fi
 done
@@ -40,6 +43,11 @@ export ANNOTATIONSYNC_E2E_WEBDAV_HOST="127.0.0.1"
 export ANNOTATIONSYNC_E2E_WEBDAV_PORT="18109"
 export ANNOTATIONSYNC_E2E_WEBDAV_USERNAME="testuser"
 export ANNOTATIONSYNC_E2E_WEBDAV_PASSWORD="testpass"
+
+# Lets two_device_harness.lua shell back out to `kodev test front` from
+# inside a running spec, to launch each device of a two-device scenario as
+# its own OS process.
+export ANNOTATIONSYNC_E2E_KO_DIR="$KO_DIR"
 
 WEBDAV_DATA_DIR=$(mktemp -d)
 WEBDAV_PID=""
