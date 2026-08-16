@@ -7,6 +7,7 @@ local util = require("util")
 
 local annotations = require("annotations")
 local utils = require("utils")
+local run_silent = require("silent_ui").run_silent
 
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
@@ -117,40 +118,6 @@ function M._sync_progress_callback(local_file, cached_file, income_file)
     end
 
     return true, local_data
-end
-
-local function run_silent(func, on_timeout)
-    local old_show = UIManager.show
-    local new_show
-    new_show = function(self, widget_item)
-        if widget_item.text == _("Successfully synchronized.") then
-            return
-        end
-        return old_show(self, widget_item)
-    end
-    UIManager.show = new_show
-
-    local restored = false
-    local function restore()
-        if not restored then
-            restored = true
-            if UIManager.show == new_show then
-                UIManager.show = old_show
-            end
-        end
-    end
-
-    -- Timeout safety fallback (15 seconds)
-    UIManager:scheduleIn(15, function()
-        if not restored then
-            if on_timeout then
-                on_timeout()
-            end
-            restore()
-        end
-    end)
-
-    func(restore)
 end
 
 function M.push_progress(widget, json_path, on_complete)
