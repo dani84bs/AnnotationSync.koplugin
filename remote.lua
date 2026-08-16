@@ -320,7 +320,7 @@ function M._sync_settings_callback(widget, local_file, cached_file, income_file)
 
     -- Merge incoming settings from other devices
     for device_id, data in pairs(income_data) do
-        if device_id ~= widget.manager:getDeviceName() then
+        if device_id ~= utils.get_device_name(widget) then
             local_data[device_id] = data
         end
     end

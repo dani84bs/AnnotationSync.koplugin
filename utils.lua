@@ -2,6 +2,7 @@ local reader_order = require("ui/elements/reader_menu_order")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
 local json = require("json")
+local Device = require("device")
 
 local M = {}
 
@@ -82,6 +83,13 @@ function M.serialize_table(tbl)
     end
     result = result .. "}"
     return result
+end
+
+function M.get_device_name(plugin)
+    if plugin.settings.device_name and plugin.settings.device_name ~= "" then
+        return plugin.settings.device_name
+    end
+    return Device.model or "unknown"
 end
 
 function M.get_nested_value(tbl, path_str)

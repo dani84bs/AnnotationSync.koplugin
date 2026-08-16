@@ -1,6 +1,5 @@
 local DocumentRegistry = require("document/documentregistry")
 local DataStorage = require("datastorage")
-local Device = require("device")
 local NetworkMgr = require("ui/network/manager")
 local util = require("util")
 local logger = require("logger")
@@ -91,13 +90,6 @@ function SyncManager:checkPendingSync()
     end
 end
 
-function SyncManager:getDeviceName()
-    if self.plugin.settings.device_name and self.plugin.settings.device_name ~= "" then
-        return self.plugin.settings.device_name
-    end
-    return Device.model or "unknown"
-end
-
 function SyncManager:saveLocalProgress(document, json_path)
     local file = document.file
     local sdr_dir = docsettings:getSidecarDir(file)
@@ -109,7 +101,7 @@ function SyncManager:saveLocalProgress(document, json_path)
         util.makePath(sdr_dir)
     end
 
-    local device_id = self:getDeviceName()
+    local device_id = utils.get_device_name(self.plugin)
     local page = self.plugin.ui:getCurrentPage()
     local total = 0
     if self.plugin.ui.paging then
@@ -628,7 +620,7 @@ function SyncManager:pushSettings()
         return
     end
 
-    local device_id = self:getDeviceName()
+    local device_id = utils.get_device_name(self.plugin)
     local local_data = {
         [device_id] = {
             settings = selected_values,

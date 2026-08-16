@@ -75,7 +75,7 @@ function M.show_jump_menu(plugin, progress_map)
     local menu_items = {}
     local jump_menu
 
-    local device_id = plugin.manager:getDeviceName()
+    local device_id = utils.get_device_name(plugin)
 
     -- Sort devices by percentage descending, breaking ties alphabetically by device name
     local devices = {}
@@ -138,7 +138,7 @@ function M.show_devices_menu(plugin, settings_map)
     local menu_items = {}
     local devices_menu
 
-    local current_device = plugin.manager:getDeviceName()
+    local current_device = utils.get_device_name(plugin)
 
     -- Sort devices alphabetically by name
     local devices = {}
