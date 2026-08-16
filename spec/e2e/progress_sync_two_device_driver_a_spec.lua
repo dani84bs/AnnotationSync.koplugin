@@ -47,6 +47,8 @@ describe("AnnotationSync E2E two-device progress sync (device A)", function()
         fastforward_ui_events()
 
         readerui:handleEvent(Event:new("AnnotationSyncPushProgress"))
+        -- syncProgress schedules the actual push via UIManager:scheduleIn,
+        -- so it needs its own tick beyond the one that runs it.
         fastforward_ui_events()
         fastforward_ui_events()
 

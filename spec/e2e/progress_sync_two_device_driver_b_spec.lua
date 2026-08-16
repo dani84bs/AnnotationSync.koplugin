@@ -62,6 +62,8 @@ describe("AnnotationSync E2E two-device progress sync (device B)", function()
         end
 
         readerui:handleEvent(Event:new("AnnotationSyncJumpToDeviceProgress"))
+        -- The real WebDAV round trip completes across more than one
+        -- UIManager tick, same as the push side in driver A.
         fastforward_ui_events()
         fastforward_ui_events()
 
@@ -76,7 +78,15 @@ describe("AnnotationSync E2E two-device progress sync (device B)", function()
         end
         assert.is_not_nil(device_a_item, "device A not found in jump menu")
         assert.is_not_nil(device_a_item.text:find("Page 5", 1, true))
-        assert.is_not_nil(device_a_item.text:find("%(%d+%%%)"))
+
+        -- Same formula manager.lua's saveLocalProgress and menus.lua's
+        -- show_jump_menu use, against this device's own (identical) copy
+        -- of the fixture -- checks the real percentage value, not just
+        -- that some percentage-shaped text is present.
+        local total_pages = readerui.document:getPageCount()
+        local expected_pct = math.floor((5 / total_pages) * 100 + 0.5)
+        assert.is_not_nil(device_a_item.text:find("(" .. expected_pct .. "%)", 1, true))
+
         assert.is_nil(device_a_item.text:find("this device", 1, true))
 
         -- Jumping via device A's entry should navigate this device there.
