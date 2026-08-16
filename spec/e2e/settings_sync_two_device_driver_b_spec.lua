@@ -1,7 +1,8 @@
 -- Device B half of the two-device settings-sync scenario -- run as its
 -- own OS process by two_device_harness, after device A has already
--- pushed and exited (see settings_sync_two_device_spec.lua). Excluded
--- from run_e2e_tests.sh's own batch; never run directly.
+-- pushed and exited (see settings_sync_two_device_spec.lua). Its
+-- `_two_device_driver_*_spec.lua` name excludes it from
+-- run_e2e_tests.sh's own batch; never run directly.
 -- Pulls from the real WebDAV server and asserts device A's setting
 -- (auto_standby_timeout_seconds = 42) is visible and importable.
 describe("AnnotationSync E2E two-device settings sync (device B)", function()

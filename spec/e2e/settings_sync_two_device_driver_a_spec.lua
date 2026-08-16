@@ -1,6 +1,6 @@
 -- Device A half of the two-device settings-sync scenario -- run as its
 -- own OS process by two_device_harness, never directly by run_e2e_tests.sh
--- (excluded from its batch; see run_e2e_tests.sh's DRIVER_EXCLUDE_PATTERN).
+-- (its `_two_device_driver_*_spec.lua` name excludes it from that batch).
 -- Pushes a known setting value to the real WebDAV server and exits.
 describe("AnnotationSync E2E two-device settings sync (device A)", function()
     local Event, ReaderUI, UIManager
