@@ -69,4 +69,33 @@ function M.seed_remote_annotations(sync_instance, file, data, test_data_dir)
     return code
 end
 
+-- Downloads and decodes the annotation map currently stored for `file` on
+-- the real WebDAV server -- the inverse of seed_remote_annotations, used
+-- to inspect what a sync actually persisted remotely.
+function M.fetch_remote_annotations(sync_instance, file, test_data_dir)
+    local WebDavApi = require("apps/cloudstorage/webdavapi")
+    local server = M.server_config()
+    local file_name = sync_instance.manager:_getAnnotationFilename(file)
+    local remote_path = WebDavApi:getJoinedPath(server.address, server.url)
+    remote_path = WebDavApi:getJoinedPath(remote_path, file_name)
+
+    local tmp_path = test_data_dir .. "/.fetch_remote.json"
+    local code = WebDavApi:downloadFile(remote_path, server.username, server.password, tmp_path)
+    if not code or code < 200 or code >= 300 then
+        os.remove(tmp_path)
+        return nil, code
+    end
+
+    local f = io.open(tmp_path, "r")
+    local content = f:read("*a")
+    f:close()
+    os.remove(tmp_path)
+
+    local ok, data = pcall(json.decode, content)
+    if not ok then
+        return nil, code
+    end
+    return data, code
+end
+
 return M
