@@ -1,6 +1,6 @@
 describe("Asynchronous Sync Reproduction Test", function()
     local ReaderUI, UIManager, SyncService, Geom
-    local AnnotationSyncPlugin, test_utils, json, util
+    local AnnotationSyncPlugin, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_repro_async_tmp"
     local old_getDataDir
@@ -19,6 +19,7 @@ describe("Asynchronous Sync Reproduction Test", function()
         
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         os.execute("mkdir -p " .. test_data_dir .. "/plugins")
@@ -39,7 +40,7 @@ describe("Asynchronous Sync Reproduction Test", function()
     end)
 
     before_each(function()
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
     end)
 
     it("reproduces the crash when sync callback is executed after temporary document is closed", function()
@@ -51,7 +52,7 @@ describe("Asynchronous Sync Reproduction Test", function()
         f:close()
 
         -- Set up changed document
-        sync_instance.manager:addToChangedDocumentsFile(file)
+        changed_documents.add(file)
 
         -- Mock getDocumentByFile to return a mock document that throws when used after closed
         local is_closed = false

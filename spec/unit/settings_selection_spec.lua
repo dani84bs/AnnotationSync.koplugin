@@ -1,5 +1,5 @@
 describe("AnnotationSync Settings Selection", function()
-    local UIManager, AnnotationSyncPlugin, test_utils, util
+    local UIManager, AnnotationSyncPlugin, test_utils, util, utils
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_settings_selection_tmp"
     local old_getDataDir
@@ -8,10 +8,11 @@ describe("AnnotationSync Settings Selection", function()
         require("commonrequire")
         local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
         package.path = plugin_path .. ";" .. package.path
-        
+
         disable_plugins()
         UIManager = require("ui/uimanager")
         util = require("util")
+        utils = require("utils")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
 
@@ -45,7 +46,7 @@ describe("AnnotationSync Settings Selection", function()
             ["auto_standby_timeout_seconds"] = 100, -- changed from default -1
         }
         local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
-        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:write("return " .. utils.serialize_table(active_reader))
         f:close()
 
         -- 2. Mock UIManager:show to capture the submenu
@@ -99,7 +100,7 @@ describe("AnnotationSync Settings Selection", function()
             ["auto_suspend_timeout_seconds"] = 200,
         }
         local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
-        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:write("return " .. utils.serialize_table(active_reader))
         f:close()
 
         local submenu
@@ -147,7 +148,7 @@ describe("AnnotationSync Settings Selection", function()
             }
         }
         local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
-        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:write("return " .. utils.serialize_table(active_reader))
         f:close()
 
         local submenu
@@ -192,7 +193,7 @@ describe("AnnotationSync Settings Selection", function()
             }
         }
         local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
-        f:write("return " .. sync_instance.manager:_serialize_table(active_reader))
+        f:write("return " .. utils.serialize_table(active_reader))
         f:close()
 
         local submenu

@@ -1,6 +1,6 @@
 describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
     local ReaderUI, UIManager, Geom, SyncService
-    local AnnotationSyncPlugin, highlight_db, test_utils, json, util
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_error_tmp"
     local old_getDataDir
@@ -21,6 +21,7 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
         highlight_db = require("spec/unit/highlight_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -50,13 +51,13 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
         sync_instance.settings.use_filename = false
         sync_instance.settings.last_sync = "Never"
         
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
     end)
 
     describe("4.1 Network & Server Errors", function()
         it("should keep document dirty if server is offline", function()
-            sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
-            assert.is_true(sync_instance.manager:hasPendingChangedDocuments())
+            changed_documents.add(readerui.document.file)
+            assert.is_true(changed_documents.has_pending())
 
             -- Mock SyncService.sync to simulate a failure (callback never called)
             SyncService.sync = function(server, local_path, sync_cb, is_silent)
@@ -67,7 +68,7 @@ describe("AnnotationSync Integration - Battery 4 (Error Handling)", function()
             sync_instance:manualSync()
 
             -- Fixed: It should now remain dirty because the callback (which triggers removal) was never called
-            assert.is_true(sync_instance.manager:hasPendingChangedDocuments())
+            assert.is_true(changed_documents.has_pending())
         end)
 
         it("should handle malformed remote data gracefully and abort upload", function()

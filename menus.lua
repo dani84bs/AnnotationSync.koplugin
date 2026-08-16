@@ -6,6 +6,7 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 local utils = require("utils")
 local annotations = require("annotations")
+local changed_documents = require("changed_documents")
 
 local M = {}
 
@@ -296,7 +297,7 @@ function M.show_differing_settings_menu(plugin, device_name, remote_settings, pa
 end
 
 function M.show_pending_documents(plugin)
-    local total, changed_docs = plugin.manager:getPendingChangedDocuments()
+    local total, changed_docs = changed_documents.get_pending()
     if total == 0 then
         utils.show_msg(_("No pending documents to sync."))
         return
@@ -356,7 +357,7 @@ function M.show_pending_documents(plugin)
                             {
                                 text = _("Remove from list"),
                                 callback = function()
-                                    plugin.manager:removeFromChangedDocumentsFileByPath(file)
+                                    changed_documents.remove_by_path(file)
                                     utils.show_msg(T(_("Removed %1 from sync list"), clean_filename))
                                     if pending_menu then UIManager:close(pending_menu) end
                                     M.show_pending_documents(plugin)

@@ -1,6 +1,6 @@
 describe("AnnotationSync PDF Core Integration", function()
     local ReaderUI, UIManager, SyncService, Geom, DataStorage
-    local AnnotationSyncPlugin, highlight_pdf_db, test_utils, json, util, annotations_mod
+    local AnnotationSyncPlugin, highlight_pdf_db, test_utils, json, util, annotations_mod, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_pdf_integration_tmp"
     local old_getDataDir
@@ -25,6 +25,7 @@ describe("AnnotationSync PDF Core Integration", function()
         highlight_pdf_db = require("spec/unit/highlight_pdf_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -54,7 +55,7 @@ describe("AnnotationSync PDF Core Integration", function()
         readerui.annotation.annotations = {}
         sync_instance.settings.last_sync = "Never"
         sync_instance.settings.use_filename = true
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
         
         test_utils.mock_sync_service(SyncService)
     end)
@@ -85,12 +86,12 @@ describe("AnnotationSync PDF Core Integration", function()
             fastforward_ui_events()
             test_utils.emulate_highlight(readerui, highlight_pdf_db[1])
 
-            local count, docs = sync_instance.manager:getPendingChangedDocuments()
+            local count, docs = changed_documents.get_pending()
             assert.is_equal(1, count)
             assert.is_true(docs[readerui.document.file])
 
             sync_instance:manualSync()
-            assert.is_false(sync_instance.manager:hasPendingChangedDocuments())
+            assert.is_false(changed_documents.has_pending())
         end)
     end)
 
@@ -281,7 +282,7 @@ describe("AnnotationSync PDF Core Integration", function()
             assert.truthy(#key > 0)
             
             -- Verify it's tracked
-            local count, docs = sync_instance.manager:getPendingChangedDocuments()
+            local count, docs = changed_documents.get_pending()
             assert.is_equal(1, count)
             
             -- Cleanup: DISABLE REFLOW before finishing

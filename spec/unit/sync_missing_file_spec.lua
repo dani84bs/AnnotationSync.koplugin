@@ -77,6 +77,7 @@ end
 local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
 package.path = plugin_path .. ";" .. package.path
 local SyncManager = require("manager")
+local changed_documents = require("changed_documents")
 
 describe("Sync Missing File Handling", function()
     local manager
@@ -120,7 +121,7 @@ describe("Sync Missing File Handling", function()
         for k, v in pairs(close_calls) do close_calls[k] = nil end
         for k, v in pairs(existing_files) do existing_files[k] = nil end
         -- Clear changed documents
-        local f = io.open(manager:changedDocumentsFile(), "w")
+        local f = io.open(changed_documents.path(), "w")
         f:write("return {}")
         f:close()
     end)
@@ -133,8 +134,8 @@ describe("Sync Missing File Handling", function()
         existing_files[doc2] = false -- Explicitly missing
 
         -- Add to changed documents
-        manager:addToChangedDocumentsFile(doc1)
-        manager:addToChangedDocumentsFile(doc2)
+        changed_documents.add(doc1)
+        changed_documents.add(doc2)
 
         -- Execute Sync All
         manager:syncAllChangedDocuments()
@@ -145,7 +146,7 @@ describe("Sync Missing File Handling", function()
         assert.is_nil(open_calls[doc2], "doc2 should NOT have been opened")
         
         -- Check if doc2 was removed from dirty list
-        local _, changed_docs_after = manager:getPendingChangedDocuments()
+        local _, changed_docs_after = changed_documents.get_pending()
         assert.is_nil(changed_docs_after[doc2], "doc2 should have been removed from the dirty list")
         assert.is_nil(changed_docs_after[doc1], "doc1 should have been removed after successful sync")
     end)

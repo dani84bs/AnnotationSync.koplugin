@@ -75,6 +75,15 @@ function M.is_path_excluded(dir, excluded_dirs)
     return false
 end
 
+function M.serialize_table(tbl)
+    local result = "{\n"
+    for k, v in pairs(tbl) do
+        result = result .. string.format("  [%q] = %s,\n", k, tostring(v))
+    end
+    result = result .. "}"
+    return result
+end
+
 function M.get_nested_value(tbl, path_str)
     if not tbl then return nil end
     local parts = {}

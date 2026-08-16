@@ -1,6 +1,6 @@
 describe("AnnotationSync Mixed Documents & Offline Sync All", function()
     local ReaderUI, UIManager, SyncService, Geom, DataStorage
-    local AnnotationSyncPlugin, highlight_db, highlight_pdf_db, test_utils, json, util
+    local AnnotationSyncPlugin, highlight_db, highlight_pdf_db, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_mixed_offline_tmp"
     local old_getDataDir
@@ -28,6 +28,7 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         highlight_pdf_db = require("spec/unit/highlight_pdf_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -56,7 +57,7 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         UIManager:show(readerui)
         fastforward_ui_events()
         readerui.annotation.annotations = {}
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
         test_utils.mock_sync_service(SyncService)
     end)
 
@@ -65,10 +66,10 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         local doc_pdf = sample_pdf_dest
         
         -- 1. Mark both as dirty
-        sync_instance.manager:addToChangedDocumentsFile(doc_epub)
-        sync_instance.manager:addToChangedDocumentsFile(doc_pdf)
+        changed_documents.add(doc_epub)
+        changed_documents.add(doc_pdf)
         
-        assert.is_equal(2, (select(1, sync_instance.manager:getPendingChangedDocuments())))
+        assert.is_equal(2, (select(1, changed_documents.get_pending())))
 
         -- 2. Mock OFFLINE server (callback never called)
         local sync_calls = 0
@@ -85,7 +86,7 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         assert.is_equal(2, sync_calls)
         
         -- 4. Verify both remain dirty because sync failed (callback never called)
-        local count, changed_docs = sync_instance.manager:getPendingChangedDocuments()
+        local count, changed_docs = changed_documents.get_pending()
         assert.is_equal(2, count)
         assert.truthy(changed_docs[doc_epub])
         assert.truthy(changed_docs[doc_pdf])
@@ -99,7 +100,7 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         sync_instance.manager:syncAllChangedDocuments()
         
         -- 7. Verify both are now clean
-        assert.is_equal(0, (select(1, sync_instance.manager:getPendingChangedDocuments())))
+        assert.is_equal(0, (select(1, changed_documents.get_pending())))
     end)
 
     it("Sync All performs full bidirectional merge for both mixed document types", function()
@@ -136,7 +137,7 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         ann_pdf_l.pos1.page = 10
         ds_pdf:saveSetting("annotations", { ann_pdf_l })
         ds_pdf:flush()
-        sync_instance.manager:addToChangedDocumentsFile(doc_pdf)
+        changed_documents.add(doc_pdf)
         
         -- Remote PDF addition
         local ann_pdf_r = util.tableDeepCopy(ann_pdf_l)
@@ -166,6 +167,6 @@ describe("AnnotationSync Mixed Documents & Offline Sync All", function()
         local ann_pdf_after = ds_pdf_after:readSetting("annotations")
         assert.is_equal(2, #ann_pdf_after)
         
-        assert.is_equal(0, (select(1, sync_instance.manager:getPendingChangedDocuments())))
+        assert.is_equal(0, (select(1, changed_documents.get_pending())))
     end)
 end)

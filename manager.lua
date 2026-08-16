@@ -17,6 +17,7 @@ local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 local menus = require("menus")
+local changed_documents = require("changed_documents")
 
 local SyncManager = {}
 
@@ -301,7 +302,7 @@ end
 
 -- Sync all changed documents listed in changed_documents.lua
 function SyncManager:syncAllChangedDocuments()
-    local total, changed_docs = self:getPendingChangedDocuments()
+    local total, changed_docs = changed_documents.get_pending()
     if total == 0 then
         utils.show_msg("No changed documents to sync.")
         return
@@ -387,7 +388,7 @@ function SyncManager:syncAllChangedDocuments()
             -- Check if file still exists
             if not util.fileExists(file) then
                 logger.warn("AnnotationSync: file missing, removing from sync list: " .. file)
-                self:removeFromChangedDocumentsFileByPath(file)
+                changed_documents.remove_by_path(file)
             else
                 logger.warn("AnnotationSync: could not open document for sync: " .. file)
                 table.insert(failed_files, file)
@@ -444,62 +445,6 @@ function SyncManager:writeAnnotationsJSON(document)
 
     local filename = self:_getAnnotationFilename(file)
     return annotations.write_annotations_json(document, self:getAnnotationsForDocument(document), sdr_dir, filename)
-end
-
-function SyncManager:changedDocumentsFile()
-    return DataStorage:getDataDir() .. "/changed_documents.lua"
-end
-
-function SyncManager:getPendingChangedDocuments()
-    local count = 0
-    local track_path = self:changedDocumentsFile()
-    local ok, changed_docs = pcall(dofile, track_path)
-    if ok and type(changed_docs) == "table" then
-        for _ in pairs(changed_docs) do count = count + 1 end
-    end
-    return count, changed_docs
-end
-
-function SyncManager:hasPendingChangedDocuments()
-    local count, _ = self:getPendingChangedDocuments()
-    return count > 0
-end
-
-function SyncManager:addToChangedDocumentsFile(file)
-    local track_path = self:changedDocumentsFile()
-    -- Load existing table or create new
-    local changed_docs = {}
-    local ok, loaded = pcall(dofile, track_path)
-    if ok and type(loaded) == "table" then
-        changed_docs = loaded
-    end
-    if file and type(file) == "string" then
-        changed_docs[file] = true
-        self:writeChangedDocumentsFile(changed_docs)
-    end
-end
-
-function SyncManager:removeFromChangedDocumentsFile(document)
-    local file = document and document.file
-    self:removeFromChangedDocumentsFileByPath(file)
-end
-
-function SyncManager:removeFromChangedDocumentsFileByPath(file)
-    if not file then return end
-    local track_path = self:changedDocumentsFile()
-    local ok, changed_docs = pcall(dofile, track_path)
-    if ok and type(changed_docs) == "table" and changed_docs[file] then
-        changed_docs[file] = nil
-        self:writeChangedDocumentsFile(changed_docs)
-    end
-end
-
-function SyncManager:writeChangedDocumentsFile(changed_docs)
-    local track_path = self:changedDocumentsFile()
-    local ok, err = util.writeToFile(self:_serialize_table(changed_docs), track_path, true, true, true)
-    if not ok then
-        logger.warn("AnnotationSync: Failed to write changed documents file: " .. track_path .. " (" .. tostring(err) .. ")")
-    end
 end
 
 -- Get annotations associated with given document
@@ -608,20 +553,10 @@ function SyncManager:_onSyncComplete(document, success, merged_list)
         if merged_list then
             self.plugin:applySyncedAnnotations(document, merged_list)
         end
-        self:removeFromChangedDocumentsFile(document)
+        changed_documents.remove(document)
     else
         logger.warn("AnnotationSync: sync failed for " .. (document.file or "unknown") .. ", keeping in changed list")
     end
-end
-
--- Helper to serialize a Lua table as code
-function SyncManager:_serialize_table(tbl)
-    local result = "{\n"
-    for k, v in pairs(tbl) do
-        result = result .. string.format("  [%q] = %s,\n", k, tostring(v))
-    end
-    result = result .. "}"
-    return result
 end
 
 function SyncManager:getSelectedSettingsWithValues()

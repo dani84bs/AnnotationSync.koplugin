@@ -1,6 +1,6 @@
 describe("Issue #34 Reproduction & Fix Verification", function()
     local ReaderUI, UIManager, SyncService, Geom, HTTPClient
-    local AnnotationSyncPlugin, highlight_db, test_utils, json, util
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_issue_34_tmp"
     local old_getDataDir
@@ -20,6 +20,7 @@ describe("Issue #34 Reproduction & Fix Verification", function()
         
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         os.execute("mkdir -p " .. test_data_dir .. "/plugins")
@@ -41,7 +42,7 @@ describe("Issue #34 Reproduction & Fix Verification", function()
 
     it("verifies that Sync All no longer reports false success on push failure", function()
         -- 1. Setup a "changed" document
-        sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+        changed_documents.add(readerui.document.file)
         
         -- 2. Mock SyncService to fail
         local old_sync = SyncService.sync
@@ -71,14 +72,14 @@ describe("Issue #34 Reproduction & Fix Verification", function()
 
         assert.is_true(found, "Sync All should have reported failure when sync failed")
         
-        local count, _ = sync_instance.manager:getPendingChangedDocuments()
+        local count, _ = changed_documents.get_pending()
         assert.is_equal(1, count, "Document should still be pending if sync failed")
     end)
 
     it("verifies sidecar directory creation for new books", function()
         -- 1. Setup a "changed" document and ensure its sidecar dir is GONE
         local file = readerui.document.file
-        sync_instance.manager:addToChangedDocumentsFile(file)
+        changed_documents.add(file)
         local sdr_dir = require("frontend/docsettings"):getSidecarDir(file)
         os.execute("rm -rf " .. sdr_dir)
         
@@ -99,13 +100,13 @@ describe("Issue #34 Reproduction & Fix Verification", function()
         assert.is_not_nil(lfs.attributes(sdr_dir), "Sidecar directory should have been created automatically")
         
         SyncService.sync = old_sync
-        local count, _ = sync_instance.manager:getPendingChangedDocuments()
+        local count, _ = changed_documents.get_pending()
         assert.is_equal(0, count, "Document should have been successfully synced")
     end)
 
     it("verifies that 404 error bodies (non-JSON) are handled gracefully", function()
         -- 1. Setup a "changed" document
-        sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+        changed_documents.add(readerui.document.file)
 
         -- 2. Mock SyncService to simulate a 404 with a non-JSON body
         local old_sync = SyncService.sync
@@ -129,7 +130,7 @@ describe("Issue #34 Reproduction & Fix Verification", function()
 
         -- 4. Verify that it succeeded (didn't abort on invalid JSON)
         SyncService.sync = old_sync
-        local count, _ = sync_instance.manager:getPendingChangedDocuments()
+        local count, _ = changed_documents.get_pending()
         assert.is_equal(0, count, "Sync should have succeeded by treating 404 body as empty state")
     end)
 end)

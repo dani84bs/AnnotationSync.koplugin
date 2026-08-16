@@ -16,6 +16,7 @@ local logger = require("logger")
 local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
+local changed_documents = require("changed_documents")
 local SyncManager = require("manager")
 local SettingsSelection = require("settings_selection")
 local menus = require("menus")
@@ -125,12 +126,7 @@ function AnnotationSyncPlugin:deletePluginSettings()
     G_reader_settings:delSetting("cloud_download_dir")
     G_reader_settings:delSetting("cloud_provider_type")
 
-    local track_path
-    if self.manager then
-        track_path = self.manager:changedDocumentsFile()
-    else
-        track_path = DataStorage:getDataDir() .. "/changed_documents.lua"
-    end
+    local track_path = changed_documents.path()
     if track_path and util.fileExists(track_path) then
         os.remove(track_path)
     end
@@ -465,7 +461,7 @@ end
 
 function AnnotationSyncPlugin:_onNetworkConnected()
     logger.dbg("AnnotationSync: handling event: NetworkConnected")
-    if self.manager:hasPendingChangedDocuments() then
+    if changed_documents.has_pending() then
         utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
         UIManager:scheduleIn(1, function()
             self.manager:syncAllChangedDocuments()
@@ -751,7 +747,7 @@ function AnnotationSyncPlugin:onAnnotationsModified(annotations)
             end
         else
             logger.dbg("AnnotationSync: " .. changes .. " Document annotations modified: " .. changed_file)
-            self.manager:addToChangedDocumentsFile(changed_file)
+            changed_documents.add(changed_file)
         end
     end
 end

@@ -1,5 +1,5 @@
 describe("AnnotationSync Settings Persistence", function()
-    local UIManager, AnnotationSyncPlugin, test_utils, json
+    local UIManager, AnnotationSyncPlugin, test_utils, json, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_settings_persistence_tmp"
     local old_getDataDir
@@ -14,6 +14,7 @@ describe("AnnotationSync Settings Persistence", function()
         json = require("json")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
     end)
@@ -153,7 +154,7 @@ describe("AnnotationSync Settings Persistence", function()
 
         -- 3. Setup a mock changed_documents.lua file
         local util = require("util")
-        local track_path = sync_instance.manager:changedDocumentsFile()
+        local track_path = changed_documents.path()
         assert.is_true(util.writeToFile("return {}", track_path, true, true, true))
         assert.is_true(util.fileExists(track_path))
 

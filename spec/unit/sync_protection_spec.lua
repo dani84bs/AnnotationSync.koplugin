@@ -1,6 +1,6 @@
 describe("AnnotationSync Sync Protection & Regressions", function()
     local ReaderUI, UIManager, Geom, SyncService
-    local AnnotationSyncPlugin, highlight_db, test_utils, json
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_protection_tmp"
     local old_getDataDir
@@ -20,6 +20,7 @@ describe("AnnotationSync Sync Protection & Regressions", function()
         highlight_db = require("spec/unit/highlight_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -47,7 +48,7 @@ describe("AnnotationSync Sync Protection & Regressions", function()
         assert.is_equal(1, #readerui.annotation.annotations)
         
         -- 2. Mark as dirty
-        sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+        changed_documents.add(readerui.document.file)
         
         -- 3. Mock sync to check what's being sent
         local last_uploaded_data

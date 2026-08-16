@@ -1,6 +1,6 @@
 describe("Dropbox Sync Reproduction", function()
     local ReaderUI, UIManager, SyncService, Geom
-    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, annotations_mod
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, annotations_mod, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_dropbox_sync_tmp"
     local old_getDataDir
@@ -21,6 +21,7 @@ describe("Dropbox Sync Reproduction", function()
         
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         os.execute("mkdir -p " .. test_data_dir .. "/plugins")
@@ -42,7 +43,7 @@ describe("Dropbox Sync Reproduction", function()
 
     it("verifies that Dropbox 'path not found' error is now handled gracefully", function()
         -- 1. Setup a "changed" document
-        sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+        changed_documents.add(readerui.document.file)
         
         -- 2. Mock SyncService to return the Dropbox error JSON in income_file
         local dropbox_error = {

@@ -27,6 +27,7 @@ local SyncService = require("apps/cloudstorage/syncservice")
 describe("Sync Document Leak Verification", function()
     local manager
     local test_utils
+    local changed_documents
     local old_getDataDir
     local open_calls = {}
     local close_calls = {}
@@ -34,9 +35,10 @@ describe("Sync Document Leak Verification", function()
     setup(function()
         local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
         package.path = plugin_path .. ";" .. package.path
-        
+
         test_utils = require("spec/unit/test_utils")
         local SyncManager = require("manager")
+        changed_documents = require("changed_documents")
         
         -- Mock Plugin object
         local mock_plugin = {
@@ -117,7 +119,7 @@ describe("Sync Document Leak Verification", function()
         open_calls = {}
         close_calls = {}
         -- Clear changed documents
-        local f = io.open(manager:changedDocumentsFile(), "w")
+        local f = io.open(changed_documents.path(), "w")
         f:write("return {}")
         f:close()
     end)
@@ -128,9 +130,9 @@ describe("Sync Document Leak Verification", function()
         local doc3 = "spec/front/unit/data/mock.pdf"
 
         -- Add to changed documents
-        manager:addToChangedDocumentsFile(doc1)
-        manager:addToChangedDocumentsFile(doc2)
-        manager:addToChangedDocumentsFile(doc3)
+        changed_documents.add(doc1)
+        changed_documents.add(doc2)
+        changed_documents.add(doc3)
 
         -- Execute Sync All
         manager:syncAllChangedDocuments()
@@ -155,7 +157,7 @@ describe("Sync Document Leak Verification", function()
 
     it("closes document handles even if sync fails (pcall verification)", function()
         local doc_fail = "spec/front/unit/data/fail.epub"
-        manager:addToChangedDocumentsFile(doc_fail)
+        changed_documents.add(doc_fail)
 
         -- Mock syncDocument to crash or fail
         local old_syncDoc = manager.syncDocument

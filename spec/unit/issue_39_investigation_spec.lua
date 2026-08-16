@@ -1,6 +1,6 @@
 describe("Issue #39 Investigation: Unintended Deletion", function()
     local ReaderUI, UIManager, SyncService, Geom
-    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, annotations_mod
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, annotations_mod, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_issue_39_tmp"
     local old_getDataDir
@@ -22,6 +22,7 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         highlight_db = require("spec/unit/highlight_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
         
         local logger = require("logger")
         logger:setLevel(logger.levels.dbg)
@@ -60,7 +61,7 @@ describe("Issue #39 Investigation: Unintended Deletion", function()
         readerui.annotation.annotations = {}
         sync_instance.settings.last_sync = "Never"
         sync_instance.settings.use_filename = true
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
     end)
 
     local function create_ann_from_db(index, note, datetime)

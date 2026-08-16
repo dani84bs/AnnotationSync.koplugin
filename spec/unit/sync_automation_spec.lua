@@ -1,6 +1,6 @@
 describe("AnnotationSync Automation & Settings", function()
     local ReaderUI, UIManager, SyncService, Geom
-    local AnnotationSyncPlugin, highlight_db, test_utils, json, util
+    local AnnotationSyncPlugin, highlight_db, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_sync_automation_tmp"
     local old_getDataDir
@@ -21,6 +21,7 @@ describe("AnnotationSync Automation & Settings", function()
         highlight_db = require("spec/unit/highlight_db")
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         _G.old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -45,7 +46,7 @@ describe("AnnotationSync Automation & Settings", function()
         UIManager:show(readerui)
         fastforward_ui_events()
         readerui.annotation.annotations = {}
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
         test_utils.mock_sync_service(SyncService)
     end)
 
@@ -73,7 +74,7 @@ describe("AnnotationSync Automation & Settings", function()
         it("triggers sync on NetworkConnected", function()
             sync_instance.settings.network_auto_sync = true
             sync_instance:registerEvents()
-            sync_instance.manager:addToChangedDocumentsFile(readerui.document.file)
+            changed_documents.add(readerui.document.file)
 
             local sync_triggered = false
             SyncService.sync = function(server, local_path, callback, upload_only)
@@ -94,8 +95,8 @@ describe("AnnotationSync Automation & Settings", function()
             local doc1 = readerui.document.file
             local doc2 = "spec/front/unit/data/leaves.epub"
             
-            sync_instance.manager:addToChangedDocumentsFile(doc1)
-            sync_instance.manager:addToChangedDocumentsFile(doc2)
+            changed_documents.add(doc1)
+            changed_documents.add(doc2)
             
             local synced_files = {}
             SyncService.sync = function(server, local_path, callback, upload_only)

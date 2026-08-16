@@ -1,6 +1,6 @@
 describe("Unsynced / Pending Documents Feature", function()
     local ReaderUI, UIManager, SyncService, Geom
-    local AnnotationSyncPlugin, test_utils, json, util
+    local AnnotationSyncPlugin, test_utils, json, util, changed_documents
     local readerui, sync_instance
     local test_data_dir = os.getenv("PWD") .. "/test_unsynced_docs_tmp"
     local old_getDataDir
@@ -19,6 +19,7 @@ describe("Unsynced / Pending Documents Feature", function()
         
         test_utils = require("spec/unit/test_utils")
         AnnotationSyncPlugin = require("main")
+        changed_documents = require("changed_documents")
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
         os.execute("mkdir -p " .. test_data_dir .. "/plugins")
@@ -40,7 +41,7 @@ describe("Unsynced / Pending Documents Feature", function()
     end)
 
     before_each(function()
-        os.remove(sync_instance.manager:changedDocumentsFile())
+        os.remove(changed_documents.path())
     end)
 
     it("verifies that Sync All tracks failed files correctly and triggers the UI warning", function()
@@ -53,8 +54,8 @@ describe("Unsynced / Pending Documents Feature", function()
         f:write("dummy")
         f:close()
 
-        sync_instance.manager:addToChangedDocumentsFile(file1)
-        sync_instance.manager:addToChangedDocumentsFile(file2)
+        changed_documents.add(file1)
+        changed_documents.add(file2)
 
         -- 2. Mock SyncService to fail for file1, and mock getDocumentByFile to crash or fail for file2
         local old_sync = SyncService.sync
@@ -110,7 +111,7 @@ describe("Unsynced / Pending Documents Feature", function()
 
     it("verifies that show_pending_documents constructs the menu and handles actions correctly", function()
         local file1 = readerui.document.file
-        sync_instance.manager:addToChangedDocumentsFile(file1)
+        changed_documents.add(file1)
 
         local menus = require("menus")
         local Menu = require("ui/widget/menu")
@@ -161,7 +162,7 @@ describe("Unsynced / Pending Documents Feature", function()
         confirm_opts.other_buttons[1][1].callback()
 
         -- Check that it is removed
-        local count, _ = sync_instance.manager:getPendingChangedDocuments()
+        local count, _ = changed_documents.get_pending()
         assert.is_equal(0, count, "Document should be removed from changed list")
 
         -- Cleanup
