@@ -95,11 +95,11 @@ describe("Sync Missing File Handling", function()
             settings = {
                 use_filename = true
             },
-            applySyncedAnnotations = function() end
         }
-        
+
         manager = SyncManager:new(mock_plugin)
         manager.getAnnotationsForDocument = function() return {} end
+        manager.applySyncedAnnotations = function() end
         
         disable_plugins()
         old_getDataDir = test_utils.setup_test_env(test_data_dir)

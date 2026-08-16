@@ -1,9 +1,6 @@
-local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
-local Event = require("ui/event")
 local Dispatcher = require("dispatcher")
 local InfoMessage = require("ui/widget/infomessage")
-local InputDialog = require("ui/widget/inputdialog")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local T = require("ffi/util").template
 local json = require("json")
@@ -13,7 +10,6 @@ local _ = gettext
 local DataStorage = require("datastorage")
 local logger = require("logger")
 
-local annotations = require("annotations")
 local remote = require("remote")
 local utils = require("utils")
 local changed_documents = require("changed_documents")
@@ -134,322 +130,7 @@ function AnnotationSyncPlugin:deletePluginSettings()
 end
 
 function AnnotationSyncPlugin:addToMainMenu(menu_items)
-    menu_items.annotation_sync_plugin = {
-        text = _("Annotation Sync"),
-        sorting_hint = self.settings.menu_location ~= "none" and self.settings.menu_location or nil,
-        sub_item_table = {
-            {
-                text = _("Settings"),
-                sub_item_table = {
-                    {
-                        text = _("Cloud settings"),
-                        enabled_func = function()
-                            return self.ui.cloudstorage ~= nil or self.has_syncservice
-                        end,
-                        callback = function()
-                            if self.ui.cloudstorage then
-                                self.ui.cloudstorage:onShowCloudStorageList(function(server)
-                                    self:onSyncServiceConfirm(server)
-                                end)
-                            elseif self.has_syncservice then
-                                local sync_service = SyncService:new {}
-                                sync_service.onConfirm = function(server)
-                                    self:onSyncServiceConfirm(server)
-                                end
-                                UIManager:show(sync_service)
-                            end
-                        end
-                    },
-                    {
-                        text = _("Use filename instead of hash"),
-                        checked_func = function()
-                            return self.settings.use_filename
-                        end,
-                        callback = function()
-                            self.settings.use_filename = not self.settings.use_filename
-                            self:saveSettings()
-                            UIManager:close()
-                        end
-                    },
-                    {
-                        text = _("Menu location"),
-                        sub_item_table = {
-                            {
-                                text = _("Tools"),
-                                checked_func = function()
-                                    return self.settings.menu_location == "tools"
-                                end,
-                                callback = function()
-                                    self.settings.menu_location = "tools"
-                                    self:saveSettings()
-                                end,
-                            },
-                            {
-                                text = _("More tools"),
-                                checked_func = function()
-                                    return self.settings.menu_location == "more_tools"
-                                end,
-                                callback = function()
-                                    self.settings.menu_location = "more_tools"
-                                    self:saveSettings()
-                                end,
-                            },
-                            {
-                                text = _("None (shown as new item)"),
-                                checked_func = function()
-                                    return self.settings.menu_location == "none"
-                                end,
-                                callback = function()
-                                    self.settings.menu_location = "none"
-                                    self:saveSettings()
-                                end,
-                            },
-                        },
-                    },
-                    {
-                        text = _("Automatically Sync All when network becomes available"),
-                        checked_func = function()
-                            return self.settings.network_auto_sync
-                        end,
-                        callback = function()
-                            self.settings.network_auto_sync = not self.settings.network_auto_sync
-                            self:saveSettings()
-                            if self.settings.network_auto_sync then
-                                self:registerEvents()
-                            end
-                            UIManager:close()
-                        end
-                    },
-                    {
-                        text = _("Enable Reading Progress Sync"),
-                        enabled_func = function()
-                            return self.ui.cloudstorage ~= nil
-                        end,
-                        checked_func = function()
-                            return self.settings.progress_sync
-                        end,
-                        callback = function()
-                            self.settings.progress_sync = not self.settings.progress_sync
-                            self:saveSettings()
-                            UIManager:close()
-                        end,
-                    },
-                    {
-                        text = _("Sync using last word of page"),
-                        enabled_func = function()
-                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
-                        end,
-                        checked_func = function()
-                            return self.settings.progress_sync_last_word
-                        end,
-                        callback = function()
-                            self.settings.progress_sync_last_word = not self.settings.progress_sync_last_word
-                            self:saveSettings()
-                            UIManager:close()
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            return T(_("Sync every %1 pages"), self.settings.progress_sync_interval)
-                        end,
-                        enabled_func = function()
-                            return self.ui.cloudstorage ~= nil and self.settings.progress_sync
-                        end,
-                        callback = function()
-                            local input
-                            input = InputDialog:new{
-                                title = _("Sync every # pages"),
-                                input = tostring(self.settings.progress_sync_interval),
-                                input_type = "number",
-                                save_callback = function(val)
-                                    local n = tonumber(val)
-                                    if n and n > 0 then
-                                        self.settings.progress_sync_interval = math.floor(n)
-                                        self:saveSettings()
-                                        if self.ui.menu and self.ui.menu.showMainMenu then
-                                            self.ui.menu:showMainMenu()
-                                        end
-                                        return true
-                                    end
-                                end
-                            }
-                            UIManager:show(input)
-                        end,
-                    },
-                    {
-                        text = _("Manage excluded directories (progress sync)"),
-                        enabled_func = function()
-                            return (self.ui.cloudstorage ~= nil or self.has_syncservice) and self.settings.progress_sync
-                        end,
-                        callback = function()
-                            require("exclude_dirs").show(self)
-                        end,
-                    },
-                    {
-                        text_func = function()
-                            local dev_name = self.settings.device_name
-                            if not dev_name or dev_name == "" then
-                                dev_name = require("device").model or "unknown"
-                            end
-                            return T(_("Device name: %1"), dev_name)
-                        end,
-                        enabled_func = function()
-                            return true
-                        end,
-                        callback = function()
-                            local default_dev_name = require("device").model or "unknown"
-                            local current_val = self.settings.device_name
-                            if not current_val or current_val == "" then
-                                current_val = default_dev_name
-                            end
-                            local input
-                            input = InputDialog:new{
-                                title = _("Set device name"),
-                                description = _("Leave empty to use the default device name."),
-                                input = current_val,
-                                save_callback = function(val)
-                                    local dev_name = val:gsub("^%s*(.-)%s*$", "%1")
-                                    if dev_name == default_dev_name then
-                                        dev_name = ""
-                                    end
-                                    self.settings.device_name = dev_name
-                                    self:saveSettings()
-                                    if self.ui.menu and self.ui.menu.showMainMenu then
-                                        self.ui.menu:showMainMenu()
-                                    end
-                                    return true
-                                end
-                            }
-                            UIManager:show(input)
-                        end,
-                    },
-                    {
-                        text = _("Show changed settings"),
-                        callback = function()
-                            self:showChangedSettings()
-                        end,
-                    },
-                    {
-                        enabled = false,
-                        text_func = function()
-                            local server = self.settings.sync_server
-                            local cloud_desc = (server and server.url) or _("None")
-                            return T(_("Current cloud: %1"), cloud_desc)
-                        end,
-                    },
-                },
-                separator = true,
-            },
-            {
-                text = _("Push settings to cloud"),
-                enabled_func = function()
-                    return self.settings.sync_server ~= nil
-                end,
-                callback = function()
-                    settings_sync.push(self)
-                end
-            },
-            {
-                text = _("Pull settings from cloud"),
-                enabled_func = function()
-                    return self.settings.sync_server ~= nil
-                end,
-                callback = function()
-                    settings_sync.pull(self)
-                end
-            },
-            {
-                text = _("Manual Sync"),
-                enabled_func = function()
-                    return (self.settings.sync_server ~= nil) and ((self.ui and self.ui.document) ~= nil)
-                end,
-                hold_callback = function()
-                    utils.show_msg(manual_sync_description)
-                end,
-                callback = function()
-                    self:manualSync()
-                end
-            },
-            {
-                text = _("Push reading progress"),
-                enabled_func = function()
-                    return (self.ui.cloudstorage ~= nil or self.has_syncservice)
-                        and (self.settings.sync_server ~= nil)
-                        and ((self.ui and self.ui.document) ~= nil)
-                end,
-                callback = function()
-                    self:onAnnotationSyncPushProgress()
-                end
-            },
-            {
-                text = _("Jump to device progress"),
-                enabled_func = function()
-                    return (self.ui.cloudstorage ~= nil or self.has_syncservice)
-                        and (self.settings.sync_server ~= nil)
-                        and ((self.ui and self.ui.document) ~= nil)
-                end,
-                callback = function()
-                    self.manager:pullProgress()
-                end
-            },
-            {
-                text = _("Sync All"),
-                enabled_func = function()
-                    return self.settings.sync_server ~= nil
-                end,
-                hold_callback = function()
-                    utils.show_msg(sync_all_description)
-                end,
-                callback = function()
-                    self.manager:syncAllChangedDocuments()
-                end,
-                separator = true,
-            },
-            {
-                text = _("Show pending/unsynced documents"),
-                enabled = true,
-                callback = function()
-                    menus.show_pending_documents(self)
-                end,
-            },
-            {
-                text = _("Show Deleted"),
-                enabled_func = function()
-                    return (self.ui and self.ui.document) ~= nil
-                end,
-                callback = function()
-                    self:showDeletedAnnotations()
-                end,
-                separator = true,
-            },
-            {
-                enabled = false,
-                text_func = function()
-                   return T(_("Last sync: %1"), self.settings.last_sync)
-                end
-            },
-            {
-                text = T(_("Plugin version: %1"), self.version),
-                keep_menu_open = true,
-                callback = function()
-                    UIManager:show(InfoMessage:new{
-                        text = T(_("%1 (%4)\nVersion: %2\n\n%3"), self.fullname, self.version, self.description, self.plugin_id),
-                    })
-                end,
-            },
-        }
-    }
-
-    if self.ui.cloudstorage == nil and not self.has_syncservice then
-        table.insert(menu_items.annotation_sync_plugin.sub_item_table, {
-            text = _("Why are some options greyed out?"),
-            callback = function()
-                UIManager:show(InfoMessage:new{
-                    text = _("Reading progress sync features are disabled because your KOReader version does not support the cloudstorage plugin.\n\nThese features require a newer KOReader release (not yet available in stable releases)."),
-                })
-            end,
-        })
-    end
+    return menus.build_main_menu(self, menu_items)
 end
 
 function AnnotationSyncPlugin:registerEvents()
@@ -467,43 +148,6 @@ function AnnotationSyncPlugin:_onNetworkConnected()
         UIManager:scheduleIn(1, function()
             self.manager:syncAllChangedDocuments()
         end)
-    end
-end
-
-function AnnotationSyncPlugin:applySyncedAnnotations(document, merged_list)
-    if self.ui and self.ui.annotation and self.ui.document == document then
-        -- 1. Sort for UI consistency
-        table.sort(merged_list, function(a, b)
-            local cmp = annotations.compare_positions(a.page, b.page, document)
-            return (cmp or 0) < 0
-        end)
-        -- 2. Update active widget state
-        self.ui.annotation.annotations = merged_list
-        self.ui.annotation:onSaveSettings()
-
-        -- 3. Notify system
-        if #merged_list > 0 then
-            UIManager:broadcastEvent(Event:new("AnnotationsModified", merged_list))
-        end
-
-        -- 4. Trigger Refreshes
-        if not document.is_pdf then
-            document:render()
-            self.ui.view:recalculate()
-            UIManager:setDirty(self.ui.view.dialog, "partial")
-        else
-            if document.resetTileCacheValidity then
-                document:resetTileCacheValidity()
-            end
-            if self.ui.view and self.ui.view.dialog then
-                UIManager:setDirty(self.ui.view.dialog, "ui")
-            end
-        end
-    else
-        -- Update sidecar directly for inactive document
-        local annotation_sidecar = docsettings:open(document.file)
-        annotation_sidecar:saveSetting("annotations", merged_list)
-        annotation_sidecar:flush()
     end
 end
 
@@ -698,7 +342,7 @@ function AnnotationSyncPlugin:restoreAnnotations(anns, silent)
     end
 
     -- 3. Apply changes once (saves to sidecar and refreshes UI)
-    self:applySyncedAnnotations(document, current)
+    self.manager:applySyncedAnnotations(document, current)
 
     -- 4. Flush to local sync JSON immediately (Fix for Issue #39 delayed flush)
     self.manager:writeAnnotationsJSON(document)
@@ -717,39 +361,8 @@ function AnnotationSyncPlugin:restoreAnnotation(ann, silent)
 end
 
 function AnnotationSyncPlugin:onAnnotationsModified(annotations)
-    if not annotations or type(annotations) ~= "table" then
-        logger.warn("AnnotationSync: Document annotations modification detected, but could not process provided annotations payload (of type: " .. type(annotations) .. ")")
-        return
-    end
-
-    -- only want to handle each changed file once, so let's keep track
-    local changed_files = {}
-    local unknown_file = "unknown_file"
-
-    -- find changed files for payload annotations
-    for _, annotation in ipairs(annotations) do
-        local changed_file = annotation.book_path
-        -- AnnotationsModified event payload does not include book_path for an active document
-        if not changed_file then
-            changed_file = self.ui and self.ui.document and self.ui.document.file
-        end
-        if not changed_file then
-            changed_file = unknown_file
-        end
-        local count = changed_files[changed_file]
-        changed_files[changed_file] = (count and count + 1) or 1
-    end
-
-    -- handle changed files
-    for changed_file, changes in pairs(changed_files) do
-        if changed_file == unknown_file then
-            if changes > 0 then
-                logger.warn("AnnotationSync: Document annotations modification detected, but could not determine file for " .. changes .. " annotations")
-            end
-        else
-            logger.dbg("AnnotationSync: " .. changes .. " Document annotations modified: " .. changed_file)
-            changed_documents.add(changed_file)
-        end
+    if self.manager then
+        self.manager:onAnnotationsModified(annotations)
     end
 end
 

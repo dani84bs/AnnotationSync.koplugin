@@ -1,6 +1,8 @@
 local UIManager = require("ui/uimanager")
 local Menu = require("ui/widget/menu")
 local ConfirmBox = require("ui/widget/confirmbox")
+local InfoMessage = require("ui/widget/infomessage")
+local InputDialog = require("ui/widget/inputdialog")
 local Event = require("ui/event")
 local _ = require("gettext")
 local T = require("ffi/util").template
@@ -8,6 +10,11 @@ local utils = require("utils")
 local annotations = require("annotations")
 local changed_documents = require("changed_documents")
 local settings_sync = require("settings_sync")
+
+local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
+
+local manual_sync_description = "Sync annotations and bookmarks of the active document."
+local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
 
 local M = {}
 
@@ -365,6 +372,325 @@ function M.show_pending_documents(plugin)
         item_table = menu_items,
     }
     UIManager:show(pending_menu)
+end
+
+function M.build_main_menu(plugin, menu_items)
+    menu_items.annotation_sync_plugin = {
+        text = _("Annotation Sync"),
+        sorting_hint = plugin.settings.menu_location ~= "none" and plugin.settings.menu_location or nil,
+        sub_item_table = {
+            {
+                text = _("Settings"),
+                sub_item_table = {
+                    {
+                        text = _("Cloud settings"),
+                        enabled_func = function()
+                            return plugin.ui.cloudstorage ~= nil or plugin.has_syncservice
+                        end,
+                        callback = function()
+                            if plugin.ui.cloudstorage then
+                                plugin.ui.cloudstorage:onShowCloudStorageList(function(server)
+                                    plugin:onSyncServiceConfirm(server)
+                                end)
+                            elseif plugin.has_syncservice then
+                                local sync_service = SyncService:new {}
+                                sync_service.onConfirm = function(server)
+                                    plugin:onSyncServiceConfirm(server)
+                                end
+                                UIManager:show(sync_service)
+                            end
+                        end
+                    },
+                    {
+                        text = _("Use filename instead of hash"),
+                        checked_func = function()
+                            return plugin.settings.use_filename
+                        end,
+                        callback = function()
+                            plugin.settings.use_filename = not plugin.settings.use_filename
+                            plugin:saveSettings()
+                            UIManager:close()
+                        end
+                    },
+                    {
+                        text = _("Menu location"),
+                        sub_item_table = {
+                            {
+                                text = _("Tools"),
+                                checked_func = function()
+                                    return plugin.settings.menu_location == "tools"
+                                end,
+                                callback = function()
+                                    plugin.settings.menu_location = "tools"
+                                    plugin:saveSettings()
+                                end,
+                            },
+                            {
+                                text = _("More tools"),
+                                checked_func = function()
+                                    return plugin.settings.menu_location == "more_tools"
+                                end,
+                                callback = function()
+                                    plugin.settings.menu_location = "more_tools"
+                                    plugin:saveSettings()
+                                end,
+                            },
+                            {
+                                text = _("None (shown as new item)"),
+                                checked_func = function()
+                                    return plugin.settings.menu_location == "none"
+                                end,
+                                callback = function()
+                                    plugin.settings.menu_location = "none"
+                                    plugin:saveSettings()
+                                end,
+                            },
+                        },
+                    },
+                    {
+                        text = _("Automatically Sync All when network becomes available"),
+                        checked_func = function()
+                            return plugin.settings.network_auto_sync
+                        end,
+                        callback = function()
+                            plugin.settings.network_auto_sync = not plugin.settings.network_auto_sync
+                            plugin:saveSettings()
+                            if plugin.settings.network_auto_sync then
+                                plugin:registerEvents()
+                            end
+                            UIManager:close()
+                        end
+                    },
+                    {
+                        text = _("Enable Reading Progress Sync"),
+                        enabled_func = function()
+                            return plugin.ui.cloudstorage ~= nil
+                        end,
+                        checked_func = function()
+                            return plugin.settings.progress_sync
+                        end,
+                        callback = function()
+                            plugin.settings.progress_sync = not plugin.settings.progress_sync
+                            plugin:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text = _("Sync using last word of page"),
+                        enabled_func = function()
+                            return plugin.ui.cloudstorage ~= nil and plugin.settings.progress_sync
+                        end,
+                        checked_func = function()
+                            return plugin.settings.progress_sync_last_word
+                        end,
+                        callback = function()
+                            plugin.settings.progress_sync_last_word = not plugin.settings.progress_sync_last_word
+                            plugin:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            return T(_("Sync every %1 pages"), plugin.settings.progress_sync_interval)
+                        end,
+                        enabled_func = function()
+                            return plugin.ui.cloudstorage ~= nil and plugin.settings.progress_sync
+                        end,
+                        callback = function()
+                            local input
+                            input = InputDialog:new{
+                                title = _("Sync every # pages"),
+                                input = tostring(plugin.settings.progress_sync_interval),
+                                input_type = "number",
+                                save_callback = function(val)
+                                    local n = tonumber(val)
+                                    if n and n > 0 then
+                                        plugin.settings.progress_sync_interval = math.floor(n)
+                                        plugin:saveSettings()
+                                        if plugin.ui.menu and plugin.ui.menu.showMainMenu then
+                                            plugin.ui.menu:showMainMenu()
+                                        end
+                                        return true
+                                    end
+                                end
+                            }
+                            UIManager:show(input)
+                        end,
+                    },
+                    {
+                        text = _("Manage excluded directories (progress sync)"),
+                        enabled_func = function()
+                            return (plugin.ui.cloudstorage ~= nil or plugin.has_syncservice) and plugin.settings.progress_sync
+                        end,
+                        callback = function()
+                            require("exclude_dirs").show(plugin)
+                        end,
+                    },
+                    {
+                        text_func = function()
+                            local dev_name = plugin.settings.device_name
+                            if not dev_name or dev_name == "" then
+                                dev_name = require("device").model or "unknown"
+                            end
+                            return T(_("Device name: %1"), dev_name)
+                        end,
+                        enabled_func = function()
+                            return true
+                        end,
+                        callback = function()
+                            local default_dev_name = require("device").model or "unknown"
+                            local current_val = plugin.settings.device_name
+                            if not current_val or current_val == "" then
+                                current_val = default_dev_name
+                            end
+                            local input
+                            input = InputDialog:new{
+                                title = _("Set device name"),
+                                description = _("Leave empty to use the default device name."),
+                                input = current_val,
+                                save_callback = function(val)
+                                    local dev_name = val:gsub("^%s*(.-)%s*$", "%1")
+                                    if dev_name == default_dev_name then
+                                        dev_name = ""
+                                    end
+                                    plugin.settings.device_name = dev_name
+                                    plugin:saveSettings()
+                                    if plugin.ui.menu and plugin.ui.menu.showMainMenu then
+                                        plugin.ui.menu:showMainMenu()
+                                    end
+                                    return true
+                                end
+                            }
+                            UIManager:show(input)
+                        end,
+                    },
+                    {
+                        text = _("Show changed settings"),
+                        callback = function()
+                            plugin:showChangedSettings()
+                        end,
+                    },
+                    {
+                        enabled = false,
+                        text_func = function()
+                            local server = plugin.settings.sync_server
+                            local cloud_desc = (server and server.url) or _("None")
+                            return T(_("Current cloud: %1"), cloud_desc)
+                        end,
+                    },
+                },
+                separator = true,
+            },
+            {
+                text = _("Push settings to cloud"),
+                enabled_func = function()
+                    return plugin.settings.sync_server ~= nil
+                end,
+                callback = function()
+                    settings_sync.push(plugin)
+                end
+            },
+            {
+                text = _("Pull settings from cloud"),
+                enabled_func = function()
+                    return plugin.settings.sync_server ~= nil
+                end,
+                callback = function()
+                    settings_sync.pull(plugin)
+                end
+            },
+            {
+                text = _("Manual Sync"),
+                enabled_func = function()
+                    return (plugin.settings.sync_server ~= nil) and ((plugin.ui and plugin.ui.document) ~= nil)
+                end,
+                hold_callback = function()
+                    utils.show_msg(manual_sync_description)
+                end,
+                callback = function()
+                    plugin:manualSync()
+                end
+            },
+            {
+                text = _("Push reading progress"),
+                enabled_func = function()
+                    return (plugin.ui.cloudstorage ~= nil or plugin.has_syncservice)
+                        and (plugin.settings.sync_server ~= nil)
+                        and ((plugin.ui and plugin.ui.document) ~= nil)
+                end,
+                callback = function()
+                    plugin:onAnnotationSyncPushProgress()
+                end
+            },
+            {
+                text = _("Jump to device progress"),
+                enabled_func = function()
+                    return (plugin.ui.cloudstorage ~= nil or plugin.has_syncservice)
+                        and (plugin.settings.sync_server ~= nil)
+                        and ((plugin.ui and plugin.ui.document) ~= nil)
+                end,
+                callback = function()
+                    plugin.manager:pullProgress()
+                end
+            },
+            {
+                text = _("Sync All"),
+                enabled_func = function()
+                    return plugin.settings.sync_server ~= nil
+                end,
+                hold_callback = function()
+                    utils.show_msg(sync_all_description)
+                end,
+                callback = function()
+                    plugin.manager:syncAllChangedDocuments()
+                end,
+                separator = true,
+            },
+            {
+                text = _("Show pending/unsynced documents"),
+                enabled = true,
+                callback = function()
+                    M.show_pending_documents(plugin)
+                end,
+            },
+            {
+                text = _("Show Deleted"),
+                enabled_func = function()
+                    return (plugin.ui and plugin.ui.document) ~= nil
+                end,
+                callback = function()
+                    plugin:showDeletedAnnotations()
+                end,
+                separator = true,
+            },
+            {
+                enabled = false,
+                text_func = function()
+                   return T(_("Last sync: %1"), plugin.settings.last_sync)
+                end
+            },
+            {
+                text = T(_("Plugin version: %1"), plugin.version),
+                keep_menu_open = true,
+                callback = function()
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("%1 (%4)\nVersion: %2\n\n%3"), plugin.fullname, plugin.version, plugin.description, plugin.plugin_id),
+                    })
+                end,
+            },
+        }
+    }
+
+    if plugin.ui.cloudstorage == nil and not plugin.has_syncservice then
+        table.insert(menu_items.annotation_sync_plugin.sub_item_table, {
+            text = _("Why are some options greyed out?"),
+            callback = function()
+                UIManager:show(InfoMessage:new{
+                    text = _("Reading progress sync features are disabled because your KOReader version does not support the cloudstorage plugin.\n\nThese features require a newer KOReader release (not yet available in stable releases)."),
+                })
+            end,
+        })
+    end
 end
 
 return M

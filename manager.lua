@@ -8,6 +8,7 @@ local ffiUtil = require("ffi/util")
 local T = ffiUtil.template
 local docsettings = require("frontend/docsettings")
 local UIManager = require("ui/uimanager")
+local Event = require("ui/event")
 local lfs = require("libs/libkoreader-lfs")
 
 local annotations = require("annotations")
@@ -537,11 +538,85 @@ end
 function SyncManager:_onSyncComplete(document, success, merged_list)
     if success then
         if merged_list then
-            self.plugin:applySyncedAnnotations(document, merged_list)
+            self:applySyncedAnnotations(document, merged_list)
         end
         changed_documents.remove(document)
     else
         logger.warn("AnnotationSync: sync failed for " .. (document.file or "unknown") .. ", keeping in changed list")
+    end
+end
+
+function SyncManager:applySyncedAnnotations(document, merged_list)
+    if self.plugin.ui and self.plugin.ui.annotation and self.plugin.ui.document == document then
+        -- 1. Sort for UI consistency
+        table.sort(merged_list, function(a, b)
+            local cmp = annotations.compare_positions(a.page, b.page, document)
+            return (cmp or 0) < 0
+        end)
+        -- 2. Update active widget state
+        self.plugin.ui.annotation.annotations = merged_list
+        self.plugin.ui.annotation:onSaveSettings()
+
+        -- 3. Notify system
+        if #merged_list > 0 then
+            UIManager:broadcastEvent(Event:new("AnnotationsModified", merged_list))
+        end
+
+        -- 4. Trigger Refreshes
+        if not document.is_pdf then
+            document:render()
+            self.plugin.ui.view:recalculate()
+            UIManager:setDirty(self.plugin.ui.view.dialog, "partial")
+        else
+            if document.resetTileCacheValidity then
+                document:resetTileCacheValidity()
+            end
+            if self.plugin.ui.view and self.plugin.ui.view.dialog then
+                UIManager:setDirty(self.plugin.ui.view.dialog, "ui")
+            end
+        end
+    else
+        -- Update sidecar directly for inactive document
+        local annotation_sidecar = docsettings:open(document.file)
+        annotation_sidecar:saveSetting("annotations", merged_list)
+        annotation_sidecar:flush()
+    end
+end
+
+function SyncManager:onAnnotationsModified(changed_annotations)
+    if not changed_annotations or type(changed_annotations) ~= "table" then
+        logger.warn("AnnotationSync: Document annotations modification detected, but could not process provided annotations payload (of type: " .. type(changed_annotations) .. ")")
+        return
+    end
+
+    -- only want to handle each changed file once, so let's keep track
+    local changed_files = {}
+    local unknown_file = "unknown_file"
+
+    -- find changed files for payload annotations
+    for _, annotation in ipairs(changed_annotations) do
+        local changed_file = annotation.book_path
+        -- AnnotationsModified event payload does not include book_path for an active document
+        if not changed_file then
+            changed_file = self.plugin.ui and self.plugin.ui.document and self.plugin.ui.document.file
+        end
+        if not changed_file then
+            changed_file = unknown_file
+        end
+        local count = changed_files[changed_file]
+        changed_files[changed_file] = (count and count + 1) or 1
+    end
+
+    -- handle changed files
+    for changed_file, changes in pairs(changed_files) do
+        if changed_file == unknown_file then
+            if changes > 0 then
+                logger.warn("AnnotationSync: Document annotations modification detected, but could not determine file for " .. changes .. " annotations")
+            end
+        else
+            logger.dbg("AnnotationSync: " .. changes .. " Document annotations modified: " .. changed_file)
+            changed_documents.add(changed_file)
+        end
     end
 end
 
