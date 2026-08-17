@@ -67,6 +67,28 @@ return {
         assert.is_equal(true, values["reader:footer.time"])
     end)
 
+    it("should never include an excluded key even if forced into selected_settings", function()
+        local f = io.open(test_data_dir .. "/settings.reader.lua", "w")
+        f:write([[
+return {
+    ["auto_standby_timeout_seconds"] = 120,
+    ["device_id"] = "forced-device-id"
+}
+]])
+        f:close()
+
+        -- Bypass the selection menu entirely: force an excluded key in.
+        sync_instance.settings.selected_settings = {
+            ["reader:auto_standby_timeout_seconds"] = true,
+            ["reader:device_id"] = true,
+        }
+
+        local values = settings_sync.get_selected_with_values(sync_instance)
+        assert.is_not_nil(values)
+        assert.is_equal(120, values["reader:auto_standby_timeout_seconds"])
+        assert.is_nil(values["reader:device_id"])
+    end)
+
     it("should correctly write local file and sync it using remote.push_settings", function()
         -- Configure mock sync server
         local test_server = { url = "http://test-server-settings", type = "webdav" }

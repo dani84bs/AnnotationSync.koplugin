@@ -8,6 +8,7 @@ local NetworkMgr = require("ui/network/manager")
 local utils = require("utils")
 local remote = require("remote")
 local settings_domain = require("settings_domain")
+local excluded_settings = require("excluded_settings")
 
 local M = {}
 
@@ -25,7 +26,7 @@ function M.get_selected_with_values(plugin)
     local caches = {}
     local result = {}
     for key, is_selected in pairs(selected) do
-        if is_selected then
+        if is_selected and not excluded_settings.is_key_excluded(key) then
             local domain, full_key = settings_domain.parse(key)
             if domain and full_key then
                 result[key] = settings_domain.get_value(domain, full_key, caches)

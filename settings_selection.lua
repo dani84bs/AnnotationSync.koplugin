@@ -4,53 +4,14 @@ local DataStorage = require("datastorage")
 local Menu = require("ui/widget/menu")
 local _ = require("gettext")
 local T = require("ffi/util").template
+local excluded_settings = require("excluded_settings")
 
 local SettingsSelection = {}
 
 function SettingsSelection.show(plugin)
     plugin.settings.selected_settings = plugin.settings.selected_settings or {}
     local root = { type = "branch", children = {} }
-    local excluded = {
-        -- Global reader settings (settings.reader.lua)
-        ["reader:device_id"] = true,
-        ["reader:device_name"] = true,
-        ["reader:lastfile"] = true,
-        ["reader:home_dir"] = true,
-        ["reader:fontmap"] = true,
-        ["reader:color_rendering"] = true,
-        ["reader:folder_shortcuts_settings"] = true,
-        ["reader:cloud_server_object"] = true,
-        ["reader:cloud_download_dir"] = true,
-        ["reader:cloud_provider_type"] = true,
-        ["reader:dict_presets"] = true,
-        ["reader:dicts_disabled"] = true,
-        ["reader:dicts_order"] = true,
-        ["reader:input_ignore_gsensor"] = true,
-        ["reader:input_lock_gsensor"] = true,
-        ["reader:input_invert_page_turn_keys"] = true,
-        ["reader:input_invert_left_page_turn_keys"] = true,
-        ["reader:input_invert_right_page_turn_keys"] = true,
-        ["reader:timezone"] = true,
-        ["reader:annotation_sync_plugin"] = true,
-        ["reader:AnnotationSync"] = true,
-        ["reader:sdl_window"] = true,
-
-        -- Expanded Font and Path settings exclusions:
-        ["reader:cre_font_family_fonts"] = true,
-        ["reader:cre_fonts_recently_selected"] = true,
-        ["reader:cover_image_cache_path"] = true,
-        ["reader:cover_image_fallback_path"] = true,
-        ["reader:document_metadata_folder"] = true,
-
-        -- Plugin settings / databases / logs
-        ["settings/cloudstorage"] = true,
-        ["settings/battery_stats"] = true,
-        ["settings/profiles"] = true,
-        ["settings/terminal"] = true,
-        ["settings/bookinfo_cache"] = true,
-        ["settings/statistics"] = true,
-        ["settings/vocabulary_builder"] = true,
-    }
+    local excluded = excluded_settings.excluded
 
     local function is_array(t)
         if type(t) ~= "table" then return false end
