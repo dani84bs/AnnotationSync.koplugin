@@ -3,6 +3,15 @@
 -- config at a real local WebDAV server (started by run_e2e_tests.sh)
 -- instead of the mocked "http://mock-server" the unit-level integration
 -- specs use.
+--
+-- Specs that sync through this module drive it by firing the real
+-- `AnnotationSyncManualSync`/`AnnotationSyncSyncAll` KOReader Events at a
+-- live ReaderUI (the same dispatch path a gesture or menu tap takes), not
+-- by calling sync internals directly.
+--
+-- Give each spec's test fixture a distinct basename: the remote annotation
+-- filename derives from it, and meson runs e2e spec files in parallel
+-- against the same shared WebDAV server.
 local json = require("json")
 local test_utils = require("spec/unit/test_utils")
 

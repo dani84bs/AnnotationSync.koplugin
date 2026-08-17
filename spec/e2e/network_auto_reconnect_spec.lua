@@ -7,9 +7,6 @@
 -- lands the change on the real WebDAV server, with no manual sync action
 -- taken. The sync logic itself is already covered by
 -- manual_sync_lifecycle_spec.lua/sync_all_happy_path_spec.lua.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>, which starts the local
--- webdav-cli server this spec talks to. Not wired into run_tests.sh/CI.
 describe("AnnotationSync E2E network auto-reconnect", function()
     local Event, UIManager, changed_documents
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_key

@@ -4,9 +4,6 @@
 -- ReaderUI -- the same dispatch path a gesture, menu tap, or
 -- `Dispatcher:execute()` takes -- and asserts a highlight round-trips
 -- correctly through a real WebDAV server (started by run_e2e_tests.sh).
---
--- Requires: ./run_e2e_tests.sh <koreader_root>, which starts the local
--- webdav-cli server this spec talks to. Not wired into run_tests.sh/CI.
 describe("AnnotationSync E2E Manual Sync lifecycle", function()
     local Event, ReaderUI, UIManager, Geom, DataStorage, docsettings
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, json, changed_documents

@@ -7,12 +7,6 @@
 -- tombstoned (find_deleted marks the uploaded entry `deleted = true`
 -- rather than removing it) and the new key being added alongside it --
 -- both locally and on the remote.
---
--- Sync is driven by firing the real `AnnotationSyncManualSync` KOReader
--- Event at a live ReaderUI, the same seam ticket 04 established.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>, which starts the local
--- webdav-cli server this spec talks to. Not wired into run_tests.sh/CI.
 describe("AnnotationSync E2E move-semantics scenario", function()
     local Event, UIManager
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_key
@@ -143,9 +137,6 @@ describe("AnnotationSync E2E move-semantics scenario", function()
         local highlight_db = require("spec/unit/highlight_db")
         local test_data_dir = os.getenv("PWD") .. "/test_e2e_move_epub_tmp"
         os.execute("mkdir -p " .. test_data_dir)
-        -- Distinct basename from other e2e spec files: `use_filename` makes
-        -- the remote annotation filename derive from this, and meson runs
-        -- spec files in parallel against the same shared WebDAV server.
         local file = fresh_copy(test_data_dir, "move.epub", "spec/front/unit/data/juliet.epub")
 
         run_move_scenario(

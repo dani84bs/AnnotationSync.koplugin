@@ -6,9 +6,6 @@
 -- and pulls, correctly seeing device A's setting -- exercising the
 -- device_id-keyed merge in settings_sync.lua that a single-device round
 -- trip can't touch at all.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>. Not wired into
--- run_tests.sh/CI.
 describe("AnnotationSync E2E two-device settings sync", function()
     local two_device_harness
 

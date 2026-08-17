@@ -5,9 +5,6 @@
 -- boots, reaches page 5, pushes progress, and exits cleanly; device B
 -- then boots fresh and pulls, correctly seeing device A's page,
 -- percentage, and device label in the "Jump to device progress" menu.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>. Not wired into
--- run_tests.sh/CI.
 describe("AnnotationSync E2E two-device progress sync", function()
     local two_device_harness
 

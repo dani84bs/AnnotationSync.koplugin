@@ -9,9 +9,6 @@
 -- (no second live ReaderUI) -- syncAllChangedDocuments/getDocumentByFile
 -- opens, syncs, and closes it transiently itself, exactly as production
 -- code does for any tracked-but-inactive document.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>, which starts the local
--- webdav-cli server this spec talks to. Not wired into run_tests.sh/CI.
 describe("AnnotationSync E2E Sync All happy path", function()
     local Event, UIManager, docsettings, changed_documents
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_key, highlight_db
@@ -64,9 +61,6 @@ describe("AnnotationSync E2E Sync All happy path", function()
         local test_data_dir = os.getenv("PWD") .. "/test_e2e_sync_all_epub_tmp"
         os.execute("mkdir -p " .. test_data_dir)
 
-        -- Distinct basenames: `use_filename` derives the remote annotation
-        -- filename from these, and meson runs e2e spec files in parallel
-        -- against the same shared WebDAV server.
         local active_file = fresh_copy(test_data_dir, "sync_all_active.epub", "spec/front/unit/data/juliet.epub")
         local inactive_file = fresh_copy(test_data_dir, "sync_all_inactive.epub", "spec/front/unit/data/juliet.epub")
 

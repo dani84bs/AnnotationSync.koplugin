@@ -10,12 +10,7 @@
 --
 -- A second annotation set is seeded directly onto the real WebDAV server
 -- (bypassing a second device) to stand in for "another device already
--- synced this". Sync itself is still driven by firing the real
--- `AnnotationSyncManualSync` KOReader Event at a live ReaderUI, the same
--- seam ticket 04 established.
---
--- Requires: ./run_e2e_tests.sh <koreader_root>, which starts the local
--- webdav-cli server this spec talks to. Not wired into run_tests.sh/CI.
+-- synced this".
 describe("AnnotationSync E2E merge/conflict smoke", function()
     local Event, UIManager, util
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_mod, changed_documents
@@ -143,9 +138,6 @@ describe("AnnotationSync E2E merge/conflict smoke", function()
         local highlight_db = require("spec/unit/highlight_db")
         local test_data_dir = os.getenv("PWD") .. "/test_e2e_clean_merge_epub_tmp"
         os.execute("mkdir -p " .. test_data_dir)
-        -- Distinct basename from other e2e spec files: `use_filename` makes
-        -- the remote annotation filename derive from this, and meson runs
-        -- spec files in parallel against the same shared WebDAV server.
         local file = fresh_copy(test_data_dir, "clean_merge.epub", "spec/front/unit/data/juliet.epub")
 
         run_clean_merge(test_data_dir, file, highlight_db[1], highlight_db[2], function(readerui)
