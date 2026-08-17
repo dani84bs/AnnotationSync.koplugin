@@ -1,17 +1,17 @@
 -- E2E: Sync All happy-path over a real local WebDAV server.
 --
 -- Distinct from manual_sync_lifecycle_spec.lua's single-document path: one
--- device tracks two EPUB documents, each with a pending local annotation
--- change, and a single real `AnnotationSyncSyncAll` KOReader Event syncs
--- both against the real remote in one shot.
+-- device tracks a mixed EPUB+PDF batch, each with a pending local
+-- annotation change, and a single real `AnnotationSyncSyncAll` KOReader
+-- Event syncs both against the real remote in one shot.
 --
--- The second document is represented purely via its docsettings sidecar
--- (no second live ReaderUI) -- syncAllChangedDocuments/getDocumentByFile
--- opens, syncs, and closes it transiently itself, exactly as production
--- code does for any tracked-but-inactive document.
+-- The PDF is represented purely via its docsettings sidecar (no second
+-- live ReaderUI) -- syncAllChangedDocuments/getDocumentByFile opens,
+-- syncs, and closes it transiently itself, exactly as production code
+-- does for any tracked-but-inactive document.
 describe("AnnotationSync E2E Sync All happy path", function()
     local Event, UIManager, docsettings, changed_documents
-    local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_key, highlight_db
+    local AnnotationSyncPlugin, test_utils, e2e_test_utils, annotations_key, highlight_db, highlight_pdf_db
 
     local function fresh_copy(test_data_dir, name, source)
         local dest = test_data_dir .. "/" .. name
@@ -22,12 +22,15 @@ describe("AnnotationSync E2E Sync All happy path", function()
     -- Seeds a local annotation directly into `file`'s docsettings sidecar
     -- and marks it pending -- mirrors what a live ReaderUI highlight +
     -- AnnotationsModified event would have produced, without a second
-    -- ReaderUI instance.
+    -- ReaderUI instance. `entry.p0`/`p1` are CRE xpointer strings (EPUB);
+    -- their absence signals a PDF entry, whose position instead lives in
+    -- the `pos0`/`pos1` coordinate tables plus a top-level `page`.
     local function seed_inactive_document(file, entry)
         local ds = docsettings:open(file)
         local ann = {
-            pos0 = entry.p0,
-            pos1 = entry.p1,
+            pos0 = entry.p0 or entry.pos0,
+            pos1 = entry.p1 or entry.pos1,
+            page = (not entry.p0) and entry.page_num or nil,
             text = entry.text,
             datetime = "2026-02-01 10:00:00",
             note = "",
@@ -55,14 +58,15 @@ describe("AnnotationSync E2E Sync All happy path", function()
         AnnotationSyncPlugin = require("main")
         annotations_key = require("annotations").annotation_key
         highlight_db = require("spec/unit/highlight_db")
+        highlight_pdf_db = require("spec/unit/highlight_pdf_db")
     end)
 
-    it("syncs two pending EPUB documents with a single Sync All event", function()
-        local test_data_dir = os.getenv("PWD") .. "/test_e2e_sync_all_epub_tmp"
+    it("syncs a pending EPUB and a pending PDF with a single Sync All event", function()
+        local test_data_dir = os.getenv("PWD") .. "/test_e2e_sync_all_mixed_tmp"
         os.execute("mkdir -p " .. test_data_dir)
 
         local active_file = fresh_copy(test_data_dir, "sync_all_active.epub", "spec/front/unit/data/juliet.epub")
-        local inactive_file = fresh_copy(test_data_dir, "sync_all_inactive.epub", "spec/front/unit/data/juliet.epub")
+        local inactive_file = fresh_copy(test_data_dir, "sync_all_inactive.pdf", "spec/front/unit/data/sample.pdf")
 
         local old_getDataDir = test_utils.setup_test_env(test_data_dir)
         local old_ImageViewer_new = test_utils.mock_image_viewer()
@@ -82,7 +86,7 @@ describe("AnnotationSync E2E Sync All happy path", function()
         assert.is_equal(1, #readerui.annotation.annotations)
         local active_key = annotations_key(readerui.annotation.annotations[1])
 
-        local inactive_ann = seed_inactive_document(inactive_file, highlight_db[2])
+        local inactive_ann = seed_inactive_document(inactive_file, highlight_pdf_db[2])
         local inactive_key = annotations_key(inactive_ann)
 
         assert.is_equal(2, (changed_documents.get_pending()))
