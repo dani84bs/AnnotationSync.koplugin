@@ -548,6 +548,8 @@ end
 
 function SyncManager:applySyncedAnnotations(document, merged_list)
     if self.plugin.ui and self.plugin.ui.annotation and self.plugin.ui.document == document then
+        local unchanged = merged_list.unchanged
+
         -- 1. Sort for UI consistency
         table.sort(merged_list, function(a, b)
             local cmp = annotations.compare_positions(a.page, b.page, document)
@@ -557,8 +559,12 @@ function SyncManager:applySyncedAnnotations(document, merged_list)
         self.plugin.ui.annotation.annotations = merged_list
         self.plugin.ui.annotation:onSaveSettings()
 
-        -- 3. Notify system
-        if #merged_list > 0 then
+        -- 3. Notify system, unless the merge changed nothing: broadcasting
+        -- a no-op AnnotationsModified still reaches KOReader's own
+        -- ReaderAnnotation:onAnnotationsModified, which stamps a fresh
+        -- datetime_updated -- breaking resync idempotency by mutating
+        -- state on every sync, changed or not.
+        if #merged_list > 0 and not unchanged then
             UIManager:broadcastEvent(Event:new("AnnotationsModified", merged_list))
         end
 

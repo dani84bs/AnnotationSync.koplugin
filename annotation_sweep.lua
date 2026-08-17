@@ -101,6 +101,35 @@ function M.is_before(a, b)
     return a_time <= b_time
 end
 
+local function deep_equal(a, b)
+    if a == b then return true end
+    if type(a) ~= "table" or type(b) ~= "table" then return false end
+    for k, v in pairs(a) do
+        if not deep_equal(v, b[k]) then return false end
+    end
+    for k in pairs(b) do
+        if a[k] == nil then return false end
+    end
+    return true
+end
+
+-- True when both annotation lists hold the same entries by key and content,
+-- order aside -- used to skip notifying the rest of the system about a
+-- merge that changed nothing.
+function M.lists_equal(list_a, list_b)
+    if #list_a ~= #list_b then return false end
+    local map_a, map_b = {}, {}
+    for _, ann in ipairs(list_a) do map_a[M.annotation_key(ann)] = ann end
+    for _, ann in ipairs(list_b) do map_b[M.annotation_key(ann)] = ann end
+    for k, v in pairs(map_a) do
+        if not deep_equal(v, map_b[k]) then return false end
+    end
+    for k in pairs(map_b) do
+        if map_a[k] == nil then return false end
+    end
+    return true
+end
+
 -- Marks entries in uploaded_map as deleted when no local annotation still
 -- overlaps their position. A single local annotation may satisfy (keep
 -- alive) several uploaded entries, so matches never advance the floor --

@@ -94,6 +94,13 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
         end
     end
 
+    -- Snapshot pre-merge state (deep copy: get_deleted_annotations mutates
+    -- local_map's entries in place) to tell a real merge outcome apart from
+    -- a no-op resync -- both local_map and merged_list are JSON-loaded, so
+    -- comparing against the live in-memory annotations instead would false
+    -- positive on float round-trip noise in PDF pos0/pos1 coordinates.
+    local pre_merge_list = M.map_to_list(util.tableDeepCopy(local_map))
+
     -- Mark deleted annotations in local_map
     M.get_deleted_annotations(local_map, last_sync_map, document, force)
 
@@ -102,6 +109,7 @@ function M.sync_callback(document, local_file, last_sync_file, income_file, forc
 
     logger.dbg("AnnotationSync:sync_callback: handling merged list")
     local merged_list = M.map_to_list(merged)
+    merged_list.unchanged = sweep.lists_equal(pre_merge_list, merged_list)
 
     util.writeToFile(json.encode(merged), local_file, true, false, true)
     return true, merged_list
