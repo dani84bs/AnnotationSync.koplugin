@@ -118,4 +118,12 @@ done
 
 echo ">> Executing e2e tests: ${TEST_NAMES[*]}..."
 cd "$KO_DIR"
-./kodev test front "${TEST_NAMES[@]}"
+# -j 1: meson's default test parallelism (one worker per core) races these
+# specs against the single shared WebDAV server and against each other's
+# KO_HOME-rooted filesystem I/O under CPU contention, causing intermittent
+# false failures (WebDAV 404s, "No such file or directory" on sidecar/cache
+# dirs, even the occasional SIGSEGV under load) that never reproduce when a
+# spec is run alone. Force sequential execution to match this suite's
+# actual design assumption (see docs/adr/0003-webdav-e2e-plain-process.md's
+# "single local dev environment, no parallel workers").
+./kodev test -j 1 front "${TEST_NAMES[@]}"
