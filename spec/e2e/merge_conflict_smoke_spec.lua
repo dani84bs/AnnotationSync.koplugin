@@ -56,9 +56,13 @@ describe("AnnotationSync E2E merge/conflict smoke", function()
         test_utils.emulate_highlight(readerui, entry_remote)
         assert.is_equal(2, #readerui.annotation.annotations)
 
-        local local_text = readerui.annotation.annotations[1].text
+        local local_ann = util.tableDeepCopy(readerui.annotation.annotations[1])
+        local local_text = local_ann.text
+        local local_datetime = local_ann.datetime
+        local local_key = annotations_mod.annotation_key(local_ann)
         local remote_ann = util.tableDeepCopy(readerui.annotation.annotations[2])
         local remote_text = remote_ann.text
+        local remote_datetime = remote_ann.datetime
         local remote_key = annotations_mod.annotation_key(remote_ann)
 
         -- Forget the remote-side addition locally: only the local
@@ -75,12 +79,21 @@ describe("AnnotationSync E2E merge/conflict smoke", function()
         readerui:handleEvent(Event:new("AnnotationSyncManualSync"))
 
         assert.is_equal(2, #readerui.annotation.annotations)
-        local texts = {}
+        local by_key = {}
         for _, ann in ipairs(readerui.annotation.annotations) do
-            texts[ann.text] = true
+            by_key[annotations_mod.annotation_key(ann)] = ann
         end
-        assert.is_true(texts[local_text])
-        assert.is_true(texts[remote_text])
+
+        local merged_local = by_key[local_key]
+        local merged_remote = by_key[remote_key]
+        assert.is_not_nil(merged_local)
+        assert.is_not_nil(merged_remote)
+        assert.is_equal(local_text, merged_local.text)
+        assert.is_equal(remote_text, merged_remote.text)
+        assert.is_equal(local_datetime, merged_local.datetime)
+        assert.is_equal(remote_datetime, merged_remote.datetime)
+        assert.is_falsy(merged_local.deleted)
+        assert.is_falsy(merged_remote.deleted)
 
         teardown(test_data_dir, readerui, old_getDataDir, old_ImageViewer_new)
     end
@@ -97,6 +110,7 @@ describe("AnnotationSync E2E merge/conflict smoke", function()
 
         local local_ann = readerui.annotation.annotations[1]
         local local_text = local_ann.text
+        local local_datetime = local_ann.datetime
         local key = annotations_mod.annotation_key(local_ann)
 
         local remote_ann = util.tableDeepCopy(local_ann)
@@ -111,7 +125,11 @@ describe("AnnotationSync E2E merge/conflict smoke", function()
         readerui:handleEvent(Event:new("AnnotationSyncManualSync"))
 
         assert.is_equal(1, #readerui.annotation.annotations)
-        assert.is_equal(local_text, readerui.annotation.annotations[1].text)
+        local merged = readerui.annotation.annotations[1]
+        assert.is_equal(key, annotations_mod.annotation_key(merged))
+        assert.is_equal(local_text, merged.text)
+        assert.is_equal(local_datetime, merged.datetime)
+        assert.is_falsy(merged.deleted)
 
         teardown(test_data_dir, readerui, old_getDataDir, old_ImageViewer_new)
     end
