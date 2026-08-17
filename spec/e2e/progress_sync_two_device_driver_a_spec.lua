@@ -52,6 +52,32 @@ describe("AnnotationSync E2E two-device progress sync (device A)", function()
         fastforward_ui_events()
         fastforward_ui_events()
 
+        -- push_progress_bg forks the actual upload into a subprocess, so
+        -- winning a fixed number of fastforward_ui_events() ticks only
+        -- wins an OS scheduling race (seen to fail once already). Poll the
+        -- real remote file until it's there instead of trusting the ticks.
+        local WebDavApi = require("apps/cloudstorage/webdavapi")
+        local ffiutil = require("ffi/util")
+        local server = e2e_test_utils.server_config()
+        local filename = sync_instance.manager:_getProgressFilename(file)
+        local remote_path = WebDavApi:getJoinedPath(server.address, server.url)
+        remote_path = WebDavApi:getJoinedPath(remote_path, filename)
+
+        local landed = false
+        local deadline = os.time() + 10
+        while os.time() < deadline do
+            local check_path = test_data_dir .. "/.progress_landed_check.json"
+            local code = WebDavApi:downloadFile(remote_path, server.username, server.password, check_path)
+            os.remove(check_path)
+            if code and code >= 200 and code < 300 then
+                landed = true
+                break
+            end
+            ffiutil.sleep(0.5)
+            fastforward_ui_events()
+        end
+        assert.is_true(landed, "device A's progress push never landed on the remote within 10s")
+
         readerui:onClose()
         test_utils.teardown_test_env(test_data_dir, old_getDataDir)
         UIManager:quit()
