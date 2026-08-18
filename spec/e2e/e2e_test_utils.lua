@@ -48,11 +48,39 @@ end
 -- server: skips test_utils' automatic SyncService mock so
 -- AnnotationSyncManualSync/AnnotationSyncSyncAll drive an actual HTTP
 -- round-trip via remote.lua's SyncServiceAdapter.
+--
+-- NOTE: this exercises apps/cloudstorage/syncservice.lua, NOT the real
+-- cloudstorage.koplugin Cloud:sync path most users are actually on (see
+-- init_real_cloudstorage_plugin_context below) -- remote.get_sync_provider
+-- prefers widget.ui.cloudstorage over the has_syncservice fallback this
+-- helper leaves in place.
 function M.init_real_remote_context(file, AnnotationSyncPlugin)
     local readerui, sync_instance = test_utils.init_integration_context(
         file, AnnotationSyncPlugin, { skip_sync_mock = true }
     )
     sync_instance.settings.sync_server = M.configure_real_remote()
+    return readerui, sync_instance
+end
+
+-- Same as init_real_remote_context, but wires readerui.cloudstorage to a
+-- real instance of cloudstorage.koplugin's Cloud (with its real webdav
+-- provider), the way PluginLoader does for actual users. remote.lua's
+-- get_sync_provider prefers ui.cloudstorage over the SyncService fallback,
+-- so this is the path real users with the Cloud Storage plugin enabled are
+-- actually on -- and the one no existing spec had exercised.
+function M.init_real_cloudstorage_plugin_context(file, AnnotationSyncPlugin)
+    local readerui, sync_instance = test_utils.init_integration_context(
+        file, AnnotationSyncPlugin, { skip_sync_mock = true }
+    )
+    local server = M.configure_real_remote()
+    sync_instance.settings.sync_server = server
+
+    local Cloud = dofile("plugins/cloudstorage.koplugin/main.lua")
+    Cloud.path = "plugins/cloudstorage.koplugin"
+    Cloud.providers = nil -- force a fresh scan; a prior test may have stubbed it
+    Cloud:getProviders()
+    readerui.cloudstorage = Cloud
+
     return readerui, sync_instance
 end
 
