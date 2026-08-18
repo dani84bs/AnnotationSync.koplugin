@@ -28,6 +28,25 @@ local function get_sync_provider(widget)
     return nil
 end
 
+-- Cloud:sync aliases provider.base to whatever table we pass as `server`,
+-- and providers like Dropbox mutate that table in place to cache an access
+-- token derived from the refresh token (koreader's DropBox.genAccessToken).
+-- Handing over our persisted sync_server settings directly would let that
+-- mutation permanently overwrite the refresh token with a short-lived one
+-- once it expires, every future sync 401s with no way to recover. A copy
+-- also means each sync re-derives its own fresh, never-stale access token.
+local function copy_sync_server(widget)
+    local server = widget.settings.sync_server
+    if not server then
+        return nil
+    end
+    local copy = {}
+    for k, v in pairs(server) do
+        copy[k] = v
+    end
+    return copy
+end
+
 local MAX_SYNC_CONFLICT_RETRIES = 5
 
 -- cloudstorage.koplugin's Cloud:sync retries a WebDAV If-Match conflict
@@ -61,7 +80,7 @@ local function perform_sync(widget, json_path, sync_cb, is_silent, on_complete)
         return
     end
 
-    local server = widget.settings.sync_server
+    local server = copy_sync_server(widget)
     if server then
         provider:sync(server, json_path, sync_cb, is_silent)
     else
@@ -158,7 +177,7 @@ function M.push_progress(widget, json_path, on_complete)
         return
     end
 
-    local server = widget.settings.sync_server
+    local server = copy_sync_server(widget)
     if server then
         local completed = false
         local cb_called = false
@@ -206,7 +225,7 @@ function M.push_progress_bg(widget, json_path, on_complete)
         return
     end
 
-    local server = widget.settings.sync_server
+    local server = copy_sync_server(widget)
     if server then
         local Trapper = require("ui/trapper")
         local logger = require("logger")
@@ -250,7 +269,7 @@ function M.pull_progress(widget, json_path, on_complete)
         return
     end
 
-    local server = widget.settings.sync_server
+    local server = copy_sync_server(widget)
     if server then
         provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
             local success, local_data = M._sync_progress_callback(widget, local_file, cached_file, income_file)
