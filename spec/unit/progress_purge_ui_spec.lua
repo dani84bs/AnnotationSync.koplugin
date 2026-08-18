@@ -106,10 +106,19 @@ describe("Purge device from progress sync UI (gh-90)", function()
     end)
 
     it("does not duplicate an entry when purging an already-purged device again", function()
+        local remote = require("remote")
         local manager = sync_instance.manager
         sync_instance.settings.purged_devices = { "OtherDevice" }
 
+        local old_push = remote.push_progress_bg
+        remote.push_progress_bg = function(widget, path, callback)
+            callback(true)
+        end
+
         manager:purgeDevice("OtherDevice")
+        fastforward_ui_events()
+
+        remote.push_progress_bg = old_push
 
         assert.is_equal(1, #sync_instance.settings.purged_devices)
     end)
