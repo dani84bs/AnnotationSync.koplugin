@@ -44,6 +44,7 @@ AnnotationSyncPlugin.default_settings = {
     device_name = "",
     selected_settings = {},
     progress_sync_excluded_dirs = {},
+    purged_devices = {},
     menu_location = "tools",
 }
 
@@ -84,6 +85,7 @@ function AnnotationSyncPlugin:init()
         self.settings.progress_sync_interval = self.default_settings.progress_sync_interval
     end
     self.settings.progress_sync_excluded_dirs = self.settings.progress_sync_excluded_dirs or {}
+    self.settings.purged_devices = self.settings.purged_devices or {}
     if self.settings.menu_location == nil then
         self.settings.menu_location = self.default_settings.menu_location
     end

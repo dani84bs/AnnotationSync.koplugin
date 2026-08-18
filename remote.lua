@@ -118,7 +118,7 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
     end
 end
 
-function M._sync_progress_callback(local_file, cached_file, income_file)
+function M._sync_progress_callback(widget, local_file, cached_file, income_file)
     local local_data = utils.read_json(local_file) or {}
     local income_data = utils.read_json(income_file) or {}
 
@@ -129,6 +129,15 @@ function M._sync_progress_callback(local_file, cached_file, income_file)
     for device_id, data in pairs(income_data) do
         if not local_data[device_id] or (data.timestamp or "") > (local_data[device_id].timestamp or "") then
             local_data[device_id] = data
+            changed = true
+        end
+    end
+
+    local purged_devices = widget.settings and widget.settings.purged_devices or {}
+    for _, device_id in ipairs(purged_devices) do
+        local existing = local_data[device_id]
+        if not (existing and existing.removed == true) then
+            local_data[device_id] = { removed = true, timestamp = os.date("%Y-%m-%d %H:%M:%S") }
             changed = true
         end
     end
@@ -165,7 +174,7 @@ function M.push_progress(widget, json_path, on_complete)
         run_silent(function(restore)
             local success = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
                 cb_called = true
-                local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
+                local success, local_data = M._sync_progress_callback(widget, local_file, cached_file, income_file)
                 on_complete_once(success)
                 UIManager:nextTick(restore)
                 return success
@@ -206,7 +215,7 @@ function M.push_progress_bg(widget, json_path, on_complete)
                 local sync_success = false
                 run_silent(function(restore)
                     local res = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
-                        sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
+                        sync_success = M._sync_progress_callback(widget, local_file, cached_file, income_file)
                         UIManager:nextTick(restore)
                         return sync_success
                     end), true)
@@ -244,7 +253,7 @@ function M.pull_progress(widget, json_path, on_complete)
     local server = widget.settings.sync_server
     if server then
         provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
-            local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
+            local success, local_data = M._sync_progress_callback(widget, local_file, cached_file, income_file)
             if on_complete then
                 on_complete(success, local_data)
             end

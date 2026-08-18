@@ -88,7 +88,9 @@ function M.show_jump_menu(plugin, progress_map)
     -- Sort devices by percentage descending, breaking ties alphabetically by device name
     local devices = {}
     for dev_id, data in pairs(progress_map) do
-        table.insert(devices, { id = dev_id, data = data })
+        if not data.removed then
+            table.insert(devices, { id = dev_id, data = data })
+        end
     end
     table.sort(devices, function(a, b)
         local a_pct = a.data.percentage or 0
@@ -147,11 +149,16 @@ function M.show_devices_menu(plugin, settings_map)
     local devices_menu
 
     local current_device = utils.get_device_name(plugin)
+    local purged_devices = (plugin.settings and plugin.settings.purged_devices) or {}
+    local purged_lookup = {}
+    for _, dev_id in ipairs(purged_devices) do
+        purged_lookup[dev_id] = true
+    end
 
     -- Sort devices alphabetically by name
     local devices = {}
     for dev_id, data in pairs(settings_map) do
-        if dev_id ~= current_device then
+        if dev_id ~= current_device and not purged_lookup[dev_id] then
             table.insert(devices, { id = dev_id, data = data })
         end
     end
@@ -291,6 +298,89 @@ function M.show_differing_settings_menu(plugin, device_name, remote_settings, pa
         item_table = menu_items,
     }
     UIManager:show(diff_menu)
+end
+
+function M.show_purge_device_menu(plugin, progress_map, on_purge)
+    local menu_items = {}
+    local purge_menu
+
+    local current_device = utils.get_device_name(plugin)
+
+    local devices = {}
+    for dev_id in pairs(progress_map) do
+        if dev_id ~= current_device then
+            table.insert(devices, dev_id)
+        end
+    end
+    table.sort(devices)
+
+    if #devices == 0 then
+        utils.show_msg(_("No other devices found in this document's progress."))
+        return
+    end
+
+    for _idx, dev_id in ipairs(devices) do
+        table.insert(menu_items, {
+            text = dev_id,
+            callback = function()
+                UIManager:show(ConfirmBox:new{
+                    text = T(_("Permanently purge \"%1\" from reading progress sync?"), dev_id),
+                    ok_text = _("Purge"),
+                    cancel_text = _("Cancel"),
+                    ok_callback = function()
+                        UIManager:close(purge_menu)
+                        on_purge(dev_id)
+                    end,
+                })
+            end,
+        })
+    end
+
+    purge_menu = Menu:new{
+        title = _("Purge device from progress sync"),
+        item_table = menu_items,
+    }
+    UIManager:show(purge_menu)
+end
+
+function M.show_purged_devices(plugin, on_unpurge)
+    plugin.settings.purged_devices = plugin.settings.purged_devices or {}
+    local menu
+    local menu_items = {}
+
+    local purged_devices = plugin.settings.purged_devices
+    if #purged_devices == 0 then
+        table.insert(menu_items, {
+            text = _("No devices purged"),
+            enabled = false,
+        })
+    else
+        for i, dev_id in ipairs(purged_devices) do
+            table.insert(menu_items, {
+                text = dev_id,
+                callback = function()
+                    UIManager:show(ConfirmBox:new{
+                        text = T(_("Stop purging \"%1\" going forward?"), dev_id),
+                        ok_text = _("Un-purge"),
+                        cancel_text = _("Cancel"),
+                        ok_callback = function()
+                            table.remove(plugin.settings.purged_devices, i)
+                            plugin:saveSettings()
+                            if menu then UIManager:close(menu) end
+                            on_unpurge(dev_id)
+                            M.show_purged_devices(plugin, on_unpurge)
+                        end,
+                    })
+                end,
+            })
+        end
+    end
+
+    menu = Menu:new{
+        title = _("Purged devices"),
+        item_table = menu_items,
+    }
+    UIManager:show(menu)
 end
 
 function M.show_pending_documents(plugin)
@@ -527,6 +617,17 @@ function M.build_main_menu(plugin, menu_items)
                         end,
                     },
                     {
+                        text = _("Manage purged devices"),
+                        enabled_func = function()
+                            return (plugin.ui.cloudstorage ~= nil or plugin.has_syncservice) and plugin.settings.progress_sync
+                        end,
+                        callback = function()
+                            M.show_purged_devices(plugin, function(device_name)
+                                plugin.manager:unpurgeDevice(device_name)
+                            end)
+                        end,
+                    },
+                    {
                         text_func = function()
                             local dev_name = plugin.settings.device_name
                             if not dev_name or dev_name == "" then
@@ -631,6 +732,17 @@ function M.build_main_menu(plugin, menu_items)
                 end,
                 callback = function()
                     plugin.manager:pullProgress()
+                end
+            },
+            {
+                text = _("Purge device from progress sync..."),
+                enabled_func = function()
+                    return (plugin.ui.cloudstorage ~= nil or plugin.has_syncservice)
+                        and (plugin.settings.sync_server ~= nil)
+                        and ((plugin.ui and plugin.ui.document) ~= nil)
+                end,
+                callback = function()
+                    plugin.manager:purgeDevicePrompt()
                 end
             },
             {

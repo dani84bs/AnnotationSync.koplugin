@@ -196,7 +196,7 @@ function SyncManager:syncProgress(on_complete)
 
     logger.info("AnnotationSync: starting progress sync")
 
-    local document = self.plugin.ui and self.plugin.ui.document
+    local document, json_path = self:_getCurrentDocumentAndProgressPath()
     if not document then
         self.is_syncing = false
         self:checkPendingSync()
@@ -205,29 +205,6 @@ function SyncManager:syncProgress(on_complete)
         end
         return
     end
-
-    local file = document.file
-    if not file then
-        self.is_syncing = false
-        self:checkPendingSync()
-        if on_complete then
-            on_complete(false)
-        end
-        return
-    end
-
-    local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then
-        self.is_syncing = false
-        self:checkPendingSync()
-        if on_complete then
-            on_complete(false)
-        end
-        return
-    end
-
-    local filename = self:_getProgressFilename(file)
-    local json_path = sdr_dir .. "/" .. filename
 
     if self:saveLocalProgress(document, json_path) then
         logger.dbg("AnnotationSync: pushing progress to remote: " .. json_path)
@@ -266,17 +243,8 @@ function SyncManager:pullProgress()
         return
     end
 
-    local document = self.plugin.ui and self.plugin.ui.document
+    local document, json_path = self:_getCurrentDocumentAndProgressPath()
     if not document then return end
-
-    local file = document.file
-    if not file then return end
-
-    local sdr_dir = docsettings:getSidecarDir(file)
-    if not sdr_dir or sdr_dir == "" then return end
-
-    local filename = self:_getProgressFilename(file)
-    local json_path = sdr_dir .. "/" .. filename
 
     -- Ensure local progress is saved so local file and sidecar dir exist before pulling
     self:saveLocalProgress(document, json_path)
@@ -289,6 +257,82 @@ function SyncManager:pullProgress()
             utils.show_msg(_("Failed to fetch remote progress"))
         end
     end)
+end
+
+function SyncManager:_getCurrentDocumentAndProgressPath()
+    local document = self.plugin.ui and self.plugin.ui.document
+    if not document then return nil end
+
+    local file = document.file
+    if not file then return nil end
+
+    local sdr_dir = docsettings:getSidecarDir(file)
+    if not sdr_dir or sdr_dir == "" then return nil end
+
+    local filename = self:_getProgressFilename(file)
+    return document, sdr_dir .. "/" .. filename
+end
+
+function SyncManager:purgeDevicePrompt()
+    if not (self.plugin.ui.cloudstorage or self.plugin.has_syncservice) then
+        utils.show_msg(_("Reading progress sync is not supported on this version of KOReader."))
+        return
+    end
+
+    local document, json_path = self:_getCurrentDocumentAndProgressPath()
+    if not document then return end
+
+    self:saveLocalProgress(document, json_path)
+    local progress_map = utils.read_json(json_path) or {}
+
+    local purged_lookup = {}
+    for _, name in ipairs(self.plugin.settings.purged_devices or {}) do
+        purged_lookup[name] = true
+    end
+    local purgeable_map = {}
+    for device_id, data in pairs(progress_map) do
+        if not purged_lookup[device_id] then
+            purgeable_map[device_id] = data
+        end
+    end
+
+    menus.show_purge_device_menu(self.plugin, purgeable_map, function(device_name)
+        self:purgeDevice(device_name)
+    end)
+end
+
+function SyncManager:purgeDevice(device_name)
+    self.plugin.settings.purged_devices = self.plugin.settings.purged_devices or {}
+    local already_purged = false
+    for _, name in ipairs(self.plugin.settings.purged_devices) do
+        if name == device_name then
+            already_purged = true
+            break
+        end
+    end
+    if not already_purged then
+        table.insert(self.plugin.settings.purged_devices, device_name)
+        self.plugin:saveSettings()
+    end
+
+    self:_writeAndPushTombstone(device_name, true)
+end
+
+function SyncManager:unpurgeDevice(device_name)
+    self:_writeAndPushTombstone(device_name, false)
+end
+
+function SyncManager:_writeAndPushTombstone(device_name, removed)
+    local document, json_path = self:_getCurrentDocumentAndProgressPath()
+    if not document then return end
+
+    self:saveLocalProgress(document, json_path)
+    local progress_map = utils.read_json(json_path) or {}
+    progress_map[device_name] = { removed = removed, timestamp = os.date("%Y-%m-%d %H:%M:%S") }
+    util.writeToFile(json.encode(progress_map), json_path, true, false, true)
+
+    if not NetworkMgr:isConnected() then return end
+    remote.push_progress_bg(self.plugin, json_path, function() end)
 end
 
 -- Sync all changed documents listed in changed_documents.lua
