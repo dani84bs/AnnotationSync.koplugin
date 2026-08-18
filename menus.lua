@@ -15,6 +15,7 @@ local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservi
 
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
+local sync_all_including_unread_description = "Scan the whole library for books with annotations that have never been synced, and sync them too."
 
 local M = {}
 
@@ -753,6 +754,18 @@ function M.build_main_menu(plugin, menu_items)
                 end,
                 callback = function()
                     plugin.manager:syncAllChangedDocuments()
+                end,
+            },
+            {
+                text = _("Sync All (including unread)"),
+                enabled_func = function()
+                    return plugin.settings.sync_server ~= nil
+                end,
+                hold_callback = function()
+                    utils.show_msg(sync_all_including_unread_description)
+                end,
+                callback = function()
+                    plugin.manager:scanAndSyncAllBooks()
                 end,
                 separator = true,
             },

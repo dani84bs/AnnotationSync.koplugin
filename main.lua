@@ -22,6 +22,7 @@ local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservi
 
 local manual_sync_description = "Sync annotations and bookmarks of the active document."
 local sync_all_description = "Sync annotations and bookmarks of all unsynced documents with pending modifications."
+local sync_all_including_unread_description = "Scan the whole library for books with annotations that have never been synced, and sync them too."
 local jump_to_device_progress_description = "Jump to the reading progress of another device."
 local push_progress_description = "Push the reading progress of the active document to the cloud."
 
@@ -158,6 +159,11 @@ function AnnotationSyncPlugin:onAnnotationSyncSyncAll()
     return true
 end
 
+function AnnotationSyncPlugin:onAnnotationSyncSyncAllIncludingUnread()
+    self.manager:scanAndSyncAllBooks()
+    return true
+end
+
 function AnnotationSyncPlugin:onAnnotationSyncManualSync()
     self:manualSync()
     return true
@@ -284,6 +290,14 @@ function AnnotationSyncPlugin:onDispatcherRegisterActions()
         event = "AnnotationSyncSyncAll",
         title = _("AnnotationSync: Sync All"),
         text = _(sync_all_description),
+        separator = true,
+        general = true
+    })
+    Dispatcher:registerAction("annotation_sync_sync_all_including_unread", {
+        category = "none",
+        event = "AnnotationSyncSyncAllIncludingUnread",
+        title = _("AnnotationSync: Sync All (including unread)"),
+        text = _(sync_all_including_unread_description),
         separator = true,
         general = true
     })

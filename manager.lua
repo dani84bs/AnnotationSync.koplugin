@@ -16,6 +16,7 @@ local remote = require("remote")
 local utils = require("utils")
 local menus = require("menus")
 local changed_documents = require("changed_documents")
+local library_scan = require("library_scan")
 
 local SyncManager = {}
 
@@ -454,6 +455,64 @@ function SyncManager:syncAllChangedDocuments()
     end
 
     processNext(1)
+end
+
+-- Scans the whole library for books with local annotations that have never
+-- been marked for sync, queues them alongside anything already pending, and
+-- runs the normal (merge-safe) Sync All over the result. Unlike Sync All,
+-- this isn't gated on "has something changed since last sync" -- it exists
+-- to seed the cloud from books synced before this plugin was installed
+-- (gh-89).
+function SyncManager:scanAndSyncAllBooks()
+    local home_dir = G_reader_settings:readSetting("home_dir")
+    if not home_dir or home_dir == "" then
+        utils.show_msg(_("No home directory configured; cannot scan library."))
+        return
+    end
+
+    local ConfirmBox = require("ui/widget/confirmbox")
+    UIManager:show(ConfirmBox:new{
+        text = _("Scan your whole library for books with annotations that have never been synced, and sync them?\n\nThis walks your library on disk and may take a while for large collections."),
+        ok_text = _("Scan && Sync"),
+        cancel_text = _("Cancel"),
+        ok_callback = function()
+            self:_scanAndSyncLibrary(home_dir)
+        end,
+    })
+end
+
+function SyncManager:_scanAndSyncLibrary(home_dir)
+    local Trapper = require("ui/trapper")
+    local excluded_dirs = self.plugin.settings.progress_sync_excluded_dirs or {}
+
+    Trapper:wrap(function()
+        local completed, found, scanned, skipped = Trapper:dismissableRunInSubprocess(function()
+            return library_scan.find_unsynced_books(home_dir, excluded_dirs)
+        end, _("Scanning library… (tap to cancel)"))
+
+        if not completed then
+            utils.show_msg(_("Library scan cancelled."))
+            return
+        end
+
+        found = found or {}
+        if #found == 0 then
+            utils.show_msg(T(_("Scanned %1 book(s); everything is already synced."), scanned or 0))
+            return
+        end
+
+        for _, file in ipairs(found) do
+            changed_documents.add(file)
+        end
+
+        if skipped and skipped > 0 then
+            utils.show_msg(T(_("Marked %1 book(s) for sync (skipped %2 unreadable). Syncing now…"), #found, skipped))
+        else
+            utils.show_msg(T(_("Marked %1 book(s) for sync. Syncing now…"), #found))
+        end
+
+        self:syncAllChangedDocuments()
+    end)
 end
 
 -- Orchestrates the sync process for a single document
