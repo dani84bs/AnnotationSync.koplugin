@@ -28,6 +28,26 @@ local function get_sync_provider(widget)
     return nil
 end
 
+local MAX_SYNC_CONFLICT_RETRIES = 5
+
+-- cloudstorage.koplugin's Cloud:sync retries a WebDAV If-Match conflict
+-- (two devices racing a write) forever -- unlike its koreader sibling
+-- SyncService.sync, which bounds the same retry to 5 tries. We can't patch
+-- koreader core from here, but the sync_cb we hand to provider:sync can
+-- itself refuse to keep going: returning false makes provider:sync's own
+-- "callback declined" path give up instead of looping indefinitely.
+local function bound_retries(sync_cb)
+    local attempts = 0
+    return function(...)
+        attempts = attempts + 1
+        if attempts > MAX_SYNC_CONFLICT_RETRIES then
+            utils.show_msg(_("Sync conflict, please try again"))
+            return false
+        end
+        return sync_cb(...)
+    end
+end
+
 local function perform_sync(widget, json_path, sync_cb, is_silent, on_complete)
     local provider = get_sync_provider(widget)
     if not provider then
@@ -143,13 +163,13 @@ function M.push_progress(widget, json_path, on_complete)
         end
 
         run_silent(function(restore)
-            local success = provider:sync(server, json_path, function(local_file, cached_file, income_file)
+            local success = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
                 cb_called = true
                 local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
                 on_complete_once(success)
                 UIManager:nextTick(restore)
                 return success
-            end, true) -- is_silent = true
+            end), true) -- is_silent = true
 
             if success == false then
                 on_complete_once(false)
@@ -185,11 +205,11 @@ function M.push_progress_bg(widget, json_path, on_complete)
             local completed, success = Trapper:dismissableRunInSubprocess(function()
                 local sync_success = false
                 run_silent(function(restore)
-                    local res = provider:sync(server, json_path, function(local_file, cached_file, income_file)
+                    local res = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
                         sync_success = M._sync_progress_callback(local_file, cached_file, income_file)
                         UIManager:nextTick(restore)
                         return sync_success
-                    end, true)
+                    end), true)
                     if res == false then
                         restore()
                     end
@@ -223,13 +243,13 @@ function M.pull_progress(widget, json_path, on_complete)
 
     local server = widget.settings.sync_server
     if server then
-        provider:sync(server, json_path, function(local_file, cached_file, income_file)
+        provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
             local success, local_data = M._sync_progress_callback(local_file, cached_file, income_file)
             if on_complete then
                 on_complete(success, local_data)
             end
             return success -- Push merged back to remote
-        end, false) -- is_silent = false
+        end), false) -- is_silent = false
     else
         if on_complete then
             on_complete(false)
