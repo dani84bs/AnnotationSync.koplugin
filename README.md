@@ -37,8 +37,10 @@
 - **Failsafe protection:** Prevents accidental remote data loss when setting up a fresh device.
 - **Trash Bin & Restoration:** Easily view and undelete accidentally removed notes/highlights.
 - **Pending Documents Queue:** View and manage documents awaiting sync, with options to sync individually or remove from the queue.
+- **Full Library Sync:** Scan your entire library for books with annotations that were never synced (not just the currently dirty ones) and sync them in one pass.
+- **Device Purging:** Remove a stale or retired device's entries from reading progress sync, with an undo (un-purge) option.
 - **Configurable sync files:** Use hashes or actual filenames for sync storage.
-- **Localization:** Available in English, Italian (it_IT), and Hungarian (hu).
+- **Localization:** Available in English, Italian (it_IT), Hungarian (hu), and Simplified Chinese (zh_CN).
 
 ## ⚠️ KOReader Version Requirements
 
@@ -95,6 +97,9 @@ On stable KOReader releases without the Cloud storage+ plugin, AnnotationSync us
 - **Sync All** — Mass-sync all documents that have pending local changes.
   - **Tools → Annotation Sync → Sync All**
 
+- **Sync All (including unread)** — Scan your entire library for books with annotations that have never been synced (not just the ones AnnotationSync already knows are dirty) and sync them too. Useful for a first-time bulk sync, or after importing an existing library with pre-made annotations.
+  - **Tools → Annotation Sync → Sync All (including unread)**
+
 - **Automatic Syncing** — Automatically run Sync All as soon as a network connection becomes available.
   - **Tools → Annotation Sync → Settings → Automatically Sync All when network becomes available**
 
@@ -120,6 +125,10 @@ On stable KOReader releases without the Cloud storage+ plugin, AnnotationSync us
 4. To jump to the progress of another device:
    - Go to **Tools → Annotation Sync → Jump to device progress**.
    - Select a device from the menu (sorted by progress percentage descending, with alphabetical tie-breaking by device name) to jump directly to its reading position.
+5. To remove a stale or retired device from progress sync:
+   - Go to **Tools → Annotation Sync → Purge device from progress sync...** and confirm the device to purge.
+   - Purged devices are hidden from the "Jump to device progress" list and no longer contribute progress data.
+   - To restore a purged device, go to **Tools → Annotation Sync → Settings → Manage purged devices** and un-purge it.
 
 ### ⚙️ Settings Synchronization
 
@@ -181,6 +190,7 @@ All AnnotationSync actions can be bound to gestures or added to KOReader profile
 |---|---|
 | AnnotationSync: Manual Sync | Sync the active document's annotations |
 | AnnotationSync: Sync All | Sync all locally-changed documents |
+| AnnotationSync: Sync All (including unread) | Scan the library and sync every book with unsynced annotations |
 | AnnotationSync: Push reading progress | Push the current page position to the cloud |
 | AnnotationSync: Jump to device progress | Open the device progress selector |
 | AnnotationSync: Push settings to cloud | Upload selected settings |
