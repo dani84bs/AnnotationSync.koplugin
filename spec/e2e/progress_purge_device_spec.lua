@@ -119,17 +119,7 @@ describe("AnnotationSync E2E purge device from progress sync", function()
         assert.is_nil(after_purge.GhostDevice.page, "purge should drop the stale page field")
 
         -- Un-purge, over the real network, and wait for the newer
-        -- removed=false record to land. Un-purging (like the real
-        -- "Purged devices" screen) also drops the name from
-        -- purged_devices first -- otherwise the next push's tombstone
-        -- injection would just re-purge it right back.
-        for i, name in ipairs(sync_instance.settings.purged_devices) do
-            if name == "GhostDevice" then
-                table.remove(sync_instance.settings.purged_devices, i)
-                break
-            end
-        end
-
+        -- removed=false record to land.
         local unpurge_result
         sync_instance.manager:unpurgeDevice("GhostDevice", function(success) unpurge_result = success end)
         assert.is_true(wait_for(function() return unpurge_result ~= nil end, 10), "un-purge push did not complete")
@@ -140,6 +130,10 @@ describe("AnnotationSync E2E purge device from progress sync", function()
         assert.is_false(after_unpurge.GhostDevice.removed, "remote GhostDevice record should be un-removed")
         assert.is_true(after_unpurge.GhostDevice.timestamp >= after_purge.GhostDevice.timestamp,
             "un-purge timestamp should not be older than the purge it supersedes")
+
+        for _, name in ipairs(sync_instance.settings.purged_devices) do
+            assert.is_not_equal("GhostDevice", name, "unpurgeDevice should drop the name from purged_devices itself")
+        end
 
         readerui:onClose()
         test_utils.teardown_test_env(test_data_dir, old_getDataDir)

@@ -355,7 +355,7 @@ function M.show_purged_devices(plugin, on_unpurge)
             enabled = false,
         })
     else
-        for i, dev_id in ipairs(purged_devices) do
+        for _idx, dev_id in ipairs(purged_devices) do
             table.insert(menu_items, {
                 text = dev_id,
                 callback = function()
@@ -364,8 +364,6 @@ function M.show_purged_devices(plugin, on_unpurge)
                         ok_text = _("Un-purge"),
                         cancel_text = _("Cancel"),
                         ok_callback = function()
-                            table.remove(plugin.settings.purged_devices, i)
-                            plugin:saveSettings()
                             if menu then UIManager:close(menu) end
                             on_unpurge(dev_id)
                             M.show_purged_devices(plugin, on_unpurge)

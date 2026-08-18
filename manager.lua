@@ -319,6 +319,19 @@ function SyncManager:purgeDevice(device_name, on_complete)
 end
 
 function SyncManager:unpurgeDevice(device_name, on_complete)
+    local purged_devices = self.plugin.settings.purged_devices or {}
+    local index_to_remove = nil
+    for i, name in ipairs(purged_devices) do
+        if name == device_name then
+            index_to_remove = i
+            break
+        end
+    end
+    if index_to_remove then
+        table.remove(purged_devices, index_to_remove)
+        self.plugin:saveSettings()
+    end
+
     self:_writeAndPushTombstone(device_name, false, on_complete)
 end
 
