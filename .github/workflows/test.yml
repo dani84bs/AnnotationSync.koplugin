@@ -35,7 +35,7 @@ jobs:
         with:
           repository: koreader/koreader
           path: koreader_core
-          ref: v2026.03
+          ref: v2026.07.2
           fetch-depth: 1
           submodules: false
 
