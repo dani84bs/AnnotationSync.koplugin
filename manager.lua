@@ -301,7 +301,7 @@ function SyncManager:purgeDevicePrompt()
     end)
 end
 
-function SyncManager:purgeDevice(device_name)
+function SyncManager:purgeDevice(device_name, on_complete)
     self.plugin.settings.purged_devices = self.plugin.settings.purged_devices or {}
     local already_purged = false
     for _, name in ipairs(self.plugin.settings.purged_devices) do
@@ -315,24 +315,32 @@ function SyncManager:purgeDevice(device_name)
         self.plugin:saveSettings()
     end
 
-    self:_writeAndPushTombstone(device_name, true)
+    self:_writeAndPushTombstone(device_name, true, on_complete)
 end
 
-function SyncManager:unpurgeDevice(device_name)
-    self:_writeAndPushTombstone(device_name, false)
+function SyncManager:unpurgeDevice(device_name, on_complete)
+    self:_writeAndPushTombstone(device_name, false, on_complete)
 end
 
-function SyncManager:_writeAndPushTombstone(device_name, removed)
+function SyncManager:_writeAndPushTombstone(device_name, removed, on_complete)
     local document, json_path = self:_getCurrentDocumentAndProgressPath()
-    if not document then return end
+    if not document then
+        if on_complete then on_complete(false) end
+        return
+    end
 
     self:saveLocalProgress(document, json_path)
     local progress_map = utils.read_json(json_path) or {}
     progress_map[device_name] = { removed = removed, timestamp = os.date("%Y-%m-%d %H:%M:%S") }
     util.writeToFile(json.encode(progress_map), json_path, true, false, true)
 
-    if not NetworkMgr:isConnected() then return end
-    remote.push_progress_bg(self.plugin, json_path, function() end)
+    if not NetworkMgr:isConnected() then
+        if on_complete then on_complete(false) end
+        return
+    end
+    remote.push_progress_bg(self.plugin, json_path, function(success)
+        if on_complete then on_complete(success) end
+    end)
 end
 
 -- Sync all changed documents listed in changed_documents.lua
