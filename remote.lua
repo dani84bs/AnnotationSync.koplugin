@@ -327,5 +327,28 @@ function M.sync_settings(widget, json_path, on_complete)
     perform_sync(widget, json_path, sync_cb, false, on_complete)
 end
 
+-- Silent transport for extractor_push.lua: unlike perform_sync, never shows
+-- an InfoMessage on a missing provider/destination -- pushExtractorData must
+-- run without any dialog of its own, so the caller falls back to an
+-- unchanged writeback instead.
+-- Returns whether a sync was actually attempted (not whether it changed
+-- anything) -- provider:sync's own return conflates "declined to run" with
+-- sync_cb's "nothing changed", which extractor_push.lua's writeback fallback
+-- needs to tell apart.
+function M.push_extractor_data(widget, json_path, sync_cb)
+    local provider = get_sync_provider(widget)
+    if not provider then
+        return false
+    end
+
+    local server = copy_sync_server(widget)
+    if not server then
+        return false
+    end
+
+    provider:sync(server, json_path, sync_cb, true) -- is_silent = true
+    return true
+end
+
 return M
 
