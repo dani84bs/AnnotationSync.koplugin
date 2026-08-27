@@ -5,8 +5,7 @@
 -- crossed -- single-device, EPUB only (page counting is format-agnostic).
 -- `remote.push_progress_bg` is monkey-patched to a spy: a real
 -- `dismissableRunInSubprocess` round trip needs genuine wall-clock time
--- the harness's `fastforward_ui_events()` can't inject deterministically
--- (see .scratch/e2e-coverage-hardening/research/page-turn-throttle-feasibility.md).
+-- the harness's `fastforward_ui_events()` can't inject deterministically.
 describe("AnnotationSync E2E progress sync throttle", function()
     local Event, UIManager, docsettings, utils
     local AnnotationSyncPlugin, test_utils, e2e_test_utils, remote

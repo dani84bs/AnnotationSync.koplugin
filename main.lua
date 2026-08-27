@@ -119,7 +119,7 @@ function AnnotationSyncPlugin:init()
 
     self:registerEvents()
 
-    -- Blessed cross-plugin call mechanism (see ADR 0007): Extractors call
+    -- Blessed cross-plugin call mechanism: Extractors call
     -- require("pluginshare").AnnotationSync.pushExtractorData(...), and may
     -- check PluginShare.AnnotationSync ~= nil to detect we're installed.
     PluginShare.AnnotationSync = {

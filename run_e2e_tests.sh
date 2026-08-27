@@ -38,7 +38,7 @@ done
 
 # Fixed host/port/credentials: single local dev environment, no parallel
 # workers, so a hardcoded address is simpler than threading a dynamic one
-# through env vars. See docs/adr/0003-webdav-e2e-plain-process.md.
+# through env vars.
 export ANNOTATIONSYNC_E2E_WEBDAV_HOST="127.0.0.1"
 export ANNOTATIONSYNC_E2E_WEBDAV_PORT="18109"
 export ANNOTATIONSYNC_E2E_WEBDAV_USERNAME="testuser"
@@ -124,6 +124,6 @@ cd "$KO_DIR"
 # false failures (WebDAV 404s, "No such file or directory" on sidecar/cache
 # dirs, even the occasional SIGSEGV under load) that never reproduce when a
 # spec is run alone. Force sequential execution to match this suite's
-# actual design assumption (see docs/adr/0003-webdav-e2e-plain-process.md's
-# "single local dev environment, no parallel workers").
+# actual design assumption: single local dev environment, no parallel
+# workers.
 ./kodev test -j 1 front "${TEST_NAMES[@]}"

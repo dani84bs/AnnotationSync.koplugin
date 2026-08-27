@@ -1,7 +1,7 @@
 -- E2E: two-device settings sync over a real local WebDAV server.
 --
 -- Simulates two genuinely separate devices as two genuinely separate OS
--- processes (see docs/adr/0004-e2e-multi-device-sequential.md): device A
+-- processes: device A
 -- boots, pushes a setting, and exits cleanly; device B then boots fresh
 -- and pulls, correctly seeing device A's setting -- exercising the
 -- device_id-keyed merge in settings_sync.lua that a single-device round
