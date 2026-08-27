@@ -36,7 +36,7 @@ AnnotationSync."
 PluginShare.AnnotationSync.pushExtractorData(
     "vocabdeck",        -- extractor_id: namespaces your storage/merge keys
     "spanish",           -- filename: e.g. one call per per-language DB
-    records,              -- table: Merge Key -> Extractor Record
+    records,              -- array of Extractor Records (each carries its own merge_key)
     function(merged_records)
         -- Write merged_records back into your own on-disk format.
     end
@@ -59,7 +59,8 @@ PluginShare.AnnotationSync.pushExtractorData(
 
 ```lua
 records = {
-    ["normalized-phrase-key"] = {
+    {
+        merge_key = "normalized-phrase-key",
         fields = {
             phrase   = { value = "hola",   policy = "write_once",      changed_at = os.time() },
             sentence = { value = "¡Hola!", policy = "write_once",      changed_at = os.time() },
@@ -69,7 +70,7 @@ records = {
 }
 ```
 
-- The **Merge Key** (the outer table key) must be a stable, content-derived
+- The **Merge Key** (`merge_key`) must be a stable, content-derived
   identifier — not a local autoincrement row id, which isn't safe across
   devices with independent databases. Derive it from something intrinsic to
   the record (e.g. a normalized phrase).

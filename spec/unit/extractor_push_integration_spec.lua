@@ -70,6 +70,14 @@ describe("Extractor push API integration", function()
         return { value = value, policy = policy, changed_at = changed_at }
     end
 
+    local function find_record(records, merge_key)
+        for _, record in ipairs(records) do
+            if record.merge_key == merge_key then
+                return record
+            end
+        end
+    end
+
     it("is reachable via PluginShare.AnnotationSync once the plugin has initialized", function()
         assert.is_not_nil(PluginShare.AnnotationSync)
         assert.is_function(PluginShare.AnnotationSync.pushExtractorData)
@@ -86,7 +94,7 @@ describe("Extractor push API integration", function()
 
         local writeback_calls = {}
         local records = {
-            hola = { fields = { phrase = field("hola", "write_once", 100) } }
+            { merge_key = "hola", fields = { phrase = field("hola", "write_once", 100) } }
         }
 
         PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "spanish", records, function(merged)
@@ -96,7 +104,7 @@ describe("Extractor push API integration", function()
         assert.is_not_nil(captured_local_path)
         assert.is_not_nil(captured_local_path:find("extractors/vocabdeck/spanish.json", 1, true))
         assert.is_equal(1, #writeback_calls)
-        assert.is_equal("hola", writeback_calls[1].hola.fields.phrase.value)
+        assert.is_equal("hola", find_record(writeback_calls[1], "hola").fields.phrase.value)
 
         SyncService.sync = old_sync
     end)
@@ -122,7 +130,7 @@ describe("Extractor push API integration", function()
         end)
 
         assert.is_not_nil(merged_result)
-        assert.is_equal("bonjour", merged_result.bonjour.fields.phrase.value)
+        assert.is_equal("bonjour", find_record(merged_result, "bonjour").fields.phrase.value)
 
         SyncService.sync = old_sync
     end)
@@ -136,7 +144,7 @@ describe("Extractor push API integration", function()
         end
 
         local records = {
-            hola = { fields = { phrase = field("hola", "write_once", 100) } }
+            { merge_key = "hola", fields = { phrase = field("hola", "write_once", 100) } }
         }
 
         -- First push seeds local + (empty) income; nothing changes on a

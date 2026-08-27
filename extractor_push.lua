@@ -9,6 +9,26 @@ local keyed_merge = require("keyed_merge")
 
 local M = {}
 
+-- Extractors hand over an array of { merge_key, fields } (their natural
+-- extraction-loop shape); keyed_merge.lua and the on-disk JSON both operate
+-- on a map keyed by merge_key. These two conversions are the only place that
+-- boundary is bridged.
+local function records_to_map(records)
+    local map = {}
+    for _, record in ipairs(records) do
+        map[record.merge_key] = { fields = record.fields }
+    end
+    return map
+end
+
+local function map_to_records(map)
+    local records = {}
+    for merge_key, record in pairs(map) do
+        table.insert(records, { merge_key = merge_key, fields = record.fields })
+    end
+    return records
+end
+
 -- Entry point registered on PluginShare.AnnotationSync. Wrapped in pcall so a
 -- throwing Extractor (extraction, sync_cb, or writeback_fn) can never abort
 -- or corrupt annotation/progress/settings sync running in the same episode.
@@ -27,7 +47,7 @@ function M._push(widget, extractor_id, filename, records, writeback_fn)
     util.makePath(dir)
     local json_path = dir .. "/" .. filename .. ".json"
 
-    local ok, write_err = util.writeToFile(json.encode(records), json_path, true, false, true)
+    local ok, write_err = util.writeToFile(json.encode(records_to_map(records)), json_path, true, false, true)
     if not ok then
         logger.warn("AnnotationSync: failed to write extractor JSON: " .. json_path .. " (" .. tostring(write_err) .. ")")
         writeback_fn(records)
@@ -43,7 +63,7 @@ function M._push(widget, extractor_id, filename, records, writeback_fn)
             util.writeToFile(json.encode(merged), local_file, true, false, true)
         end
 
-        writeback_fn(merged)
+        writeback_fn(map_to_records(merged))
         return changed
     end
 
