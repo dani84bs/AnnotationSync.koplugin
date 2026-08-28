@@ -329,8 +329,9 @@ end
 
 -- Silent transport for extractor_push.lua: unlike perform_sync, never shows
 -- an InfoMessage on a missing provider/destination -- pushExtractorData must
--- run without any dialog of its own, so the caller falls back to an
--- unchanged writeback instead.
+-- run without a dialog of its own for that case, so the caller falls back to
+-- an unchanged writeback instead. bound_retries' own give-up message is the
+-- one exception, surfaced only on a real, otherwise-invisible conflict hang.
 -- Returns whether a sync was actually attempted (not whether it changed
 -- anything) -- provider:sync's own return conflates "declined to run" with
 -- sync_cb's "nothing changed", which extractor_push.lua's writeback fallback
@@ -346,7 +347,7 @@ function M.push_extractor_data(widget, json_path, sync_cb)
         return false
     end
 
-    provider:sync(server, json_path, sync_cb, true) -- is_silent = true
+    provider:sync(server, json_path, bound_retries(sync_cb), true) -- is_silent = true
     return true
 end
 
