@@ -41,13 +41,13 @@ function M.push(widget, extractor_id, filename, records, writeback_fn)
 end
 
 function M._push(widget, extractor_id, filename, records, writeback_fn)
-    -- Namespaced by joining extractor_id/filename into one flat basename, not
-    -- a real subdirectory: KOReader's cloudstorage sync (Cloud:sync) reduces
-    -- whatever path it's given to ffiUtil.basename(file_path) before talking
-    -- to the remote, so a nested "extractors/<extractor_id>/<filename>.json"
-    -- path silently loses the extractor_id segment on the wire -- only the
-    -- basename itself can carry the namespacing remotely.
-    local dir = DataStorage:getDataDir() .. "/extractors"
+    -- Local storage nests by extractor_id for on-disk readability, but the
+    -- basename itself still carries the extractor_id/filename join: every
+    -- KOReader sync transport (Cloud:sync, SyncService.sync) reduces whatever
+    -- path it's given to ffiUtil.basename(file_path) before talking to the
+    -- remote, so only the basename survives upload -- a bare "spanish.json"
+    -- would lose the namespacing remotely regardless of local nesting.
+    local dir = DataStorage:getDataDir() .. "/extractors/" .. extractor_id
     util.makePath(dir)
     local json_path = dir .. "/" .. extractor_id .. "__" .. filename .. ".json"
 

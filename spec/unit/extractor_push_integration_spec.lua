@@ -102,7 +102,7 @@ describe("Extractor push API integration", function()
         end)
 
         assert.is_not_nil(captured_local_path)
-        assert.is_not_nil(captured_local_path:find("extractors/vocabdeck__spanish.json", 1, true))
+        assert.is_not_nil(captured_local_path:find("extractors/vocabdeck/vocabdeck__spanish.json", 1, true))
         assert.is_equal(1, #writeback_calls)
         assert.is_equal("hola", find_record(writeback_calls[1], "hola").fields.phrase.value)
 
