@@ -41,11 +41,15 @@ function M.push(widget, extractor_id, filename, records, writeback_fn)
 end
 
 function M._push(widget, extractor_id, filename, records, writeback_fn)
-    -- Namespaced by <extractor_id>/<filename> so two Extractors (or one
-    -- Extractor's multiple files) can never collide in storage or merge keys.
-    local dir = DataStorage:getDataDir() .. "/extractors/" .. extractor_id
+    -- Namespaced by joining extractor_id/filename into one flat basename, not
+    -- a real subdirectory: KOReader's cloudstorage sync (Cloud:sync) reduces
+    -- whatever path it's given to ffiUtil.basename(file_path) before talking
+    -- to the remote, so a nested "extractors/<extractor_id>/<filename>.json"
+    -- path silently loses the extractor_id segment on the wire -- only the
+    -- basename itself can carry the namespacing remotely.
+    local dir = DataStorage:getDataDir() .. "/extractors"
     util.makePath(dir)
-    local json_path = dir .. "/" .. filename .. ".json"
+    local json_path = dir .. "/" .. extractor_id .. "__" .. filename .. ".json"
 
     local ok, write_err = util.writeToFile(json.encode(records_to_map(records)), json_path, true, false, true)
     if not ok then
@@ -59,9 +63,13 @@ function M._push(widget, extractor_id, filename, records, writeback_fn)
         local income_data = utils.read_json(income_file) or {}
 
         local merged, changed = keyed_merge.merge(local_data, income_data)
-        if changed then
-            util.writeToFile(json.encode(merged), local_file, true, false, true)
-        end
+        -- Always persist the merged result locally, regardless of `changed`:
+        -- `changed` answers "does remote need this," which is a separate
+        -- question from "did local's own on-disk cache just learn something
+        -- from incoming" -- skipping this write on every non-upload merge
+        -- let the local cache drift stale against what writeback_fn already
+        -- received.
+        util.writeToFile(json.encode(merged), local_file, true, false, true)
 
         writeback_fn(map_to_records(merged))
         return changed

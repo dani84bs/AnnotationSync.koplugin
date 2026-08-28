@@ -83,7 +83,7 @@ describe("Extractor push API integration", function()
         assert.is_function(PluginShare.AnnotationSync.pushExtractorData)
     end)
 
-    it("namespaces the synced path by <extractor_id>/<filename>, reuploads only on change, and always calls writeback_fn", function()
+    it("namespaces the synced path by <extractor_id>__<filename>, reuploads only on change, and always calls writeback_fn", function()
         local captured_local_path
         local old_sync = SyncService.sync
         SyncService.sync = function(server, local_path, callback, is_silent)
@@ -102,9 +102,54 @@ describe("Extractor push API integration", function()
         end)
 
         assert.is_not_nil(captured_local_path)
-        assert.is_not_nil(captured_local_path:find("extractors/vocabdeck/spanish.json", 1, true))
+        assert.is_not_nil(captured_local_path:find("extractors/vocabdeck__spanish.json", 1, true))
         assert.is_equal(1, #writeback_calls)
         assert.is_equal("hola", find_record(writeback_calls[1], "hola").fields.phrase.value)
+
+        SyncService.sync = old_sync
+    end)
+
+    it("puts extractor_id__filename in the basename so it survives a basename-only remote", function()
+        -- Regression (gh-95): KOReader's Cloud:sync reduces whatever path
+        -- it's given to ffiUtil.basename(file_path) before talking to the
+        -- remote, so only the basename itself can carry namespacing on the
+        -- wire -- a real "extractors/<extractor_id>/<filename>" subdirectory
+        -- would silently lose the extractor_id segment remotely.
+        local ffiUtil = require("ffi/util")
+        local captured_local_path
+        local old_sync = SyncService.sync
+        SyncService.sync = function(server, local_path, callback, is_silent)
+            captured_local_path = local_path
+            return callback(local_path, local_path .. ".last_sync", local_path .. ".income")
+        end
+
+        local records = {
+            { merge_key = "hola", fields = { phrase = field("hola", "write_once", 100) } }
+        }
+        PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "basename-check", records, function() end)
+
+        assert.is_equal("vocabdeck__basename-check.json", ffiUtil.basename(captured_local_path))
+
+        SyncService.sync = old_sync
+    end)
+
+    it("reports changed=true on a first sync against an empty remote", function()
+        -- Regression (gh-94): keyed_merge previously only flagged `changed`
+        -- when incoming taught local something new, so a genuine first sync
+        -- (empty incoming) never uploaded local-only data at all.
+        local sync_cb_result
+        local old_sync = SyncService.sync
+        SyncService.sync = function(server, local_path, callback, is_silent)
+            sync_cb_result = callback(local_path, local_path .. ".last_sync", local_path .. ".income")
+            return sync_cb_result
+        end
+
+        local records = {
+            { merge_key = "hola", fields = { phrase = field("hola", "write_once", 100) } }
+        }
+        PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "first-sync", records, function() end)
+
+        assert.is_true(sync_cb_result)
 
         SyncService.sync = old_sync
     end)
@@ -135,11 +180,26 @@ describe("Extractor push API integration", function()
         SyncService.sync = old_sync
     end)
 
-    it("reports changed=false when incoming data introduces nothing new", function()
+    it("reports changed=false on a second push once remote already has the data", function()
+        -- A fake single-file WebDAV: income mirrors whatever the previous
+        -- successful upload wrote, so this actually exercises "does remote
+        -- need this" rather than always handing back an empty incoming.
+        local remote_store = {}
         local sync_cb_result
         local old_sync = SyncService.sync
         SyncService.sync = function(server, local_path, callback, is_silent)
-            sync_cb_result = callback(local_path, local_path .. ".last_sync", local_path .. ".income")
+            local income_path = local_path .. ".income"
+            local f = io.open(income_path, "w")
+            f:write(json.encode(remote_store[local_path] or {}))
+            f:close()
+
+            sync_cb_result = callback(local_path, local_path .. ".last_sync", income_path)
+            os.remove(income_path)
+
+            if sync_cb_result then
+                local uploaded = io.open(local_path):read("*a")
+                remote_store[local_path] = json.decode(uploaded)
+            end
             return sync_cb_result
         end
 
@@ -147,11 +207,12 @@ describe("Extractor push API integration", function()
             { merge_key = "hola", fields = { phrase = field("hola", "write_once", 100) } }
         }
 
-        -- First push seeds local + (empty) income; nothing changes on a
-        -- second push with the exact same records.
+        -- First push: empty remote -> uploads and seeds remote_store.
         PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "spanish2", records, function() end)
-        PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "spanish2", records, function() end)
+        assert.is_true(sync_cb_result)
 
+        -- Second push with the exact same records: remote already matches.
+        PluginShare.AnnotationSync.pushExtractorData("vocabdeck", "spanish2", records, function() end)
         assert.is_false(sync_cb_result)
 
         SyncService.sync = old_sync

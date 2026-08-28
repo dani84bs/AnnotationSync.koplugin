@@ -44,8 +44,8 @@ PluginShare.AnnotationSync.pushExtractorData(
 ```
 
 - `extractor_id` and `filename` together namespace your data
-  (`<extractor_id>/<filename>`), so two Extractors — or one Extractor's
-  multiple files — never collide.
+  (`<extractor_id>__<filename>`), so two Extractors — or one Extractor's
+  multiple files — never collide, on disk or on the remote.
 - `writeback_fn` is always called, whether or not anything changed. Writing
   the merged result back into your plugin's own file format is entirely
   your responsibility; AnnotationSync only invokes the callback.
