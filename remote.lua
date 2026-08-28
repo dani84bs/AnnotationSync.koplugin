@@ -4,6 +4,7 @@ local UIManager = require("ui/uimanager")
 local T = require("ffi/util").template
 local _ = require("gettext")
 local util = require("util")
+local logger = require("logger")
 
 local annotations = require("annotations")
 local utils = require("utils")
@@ -12,6 +13,19 @@ local run_silent = require("silent_ui").run_silent
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
 local M = {}
+
+-- gh-97: two hangs with zero log output during an episode, no repro found yet.
+-- These boundary logs (only visible with debug logging on) let a future
+-- recurrence show whether the stall is before sync_cb ever runs (provider/
+-- network layer, outside this plugin) or after (this plugin's own merge code).
+local function log_wrapped_sync_cb(label, json_path, sync_cb)
+    return function(local_file, cached_file, income_file)
+        logger.dbg("AnnotationSync: " .. label .. ": sync_cb entered for " .. json_path)
+        local success, result = sync_cb(local_file, cached_file, income_file)
+        logger.dbg("AnnotationSync: " .. label .. ": sync_cb returning " .. tostring(success) .. " for " .. json_path)
+        return success, result
+    end
+end
 
 -- Adapts SyncService's static sync(server, ...) into the same :sync(server, ...)
 -- method call shape as widget.ui.cloudstorage, so callers never branch on backend.
@@ -82,7 +96,8 @@ local function perform_sync(widget, json_path, sync_cb, is_silent, on_complete)
 
     local server = copy_sync_server(widget)
     if server then
-        provider:sync(server, json_path, sync_cb, is_silent)
+        logger.dbg("AnnotationSync: perform_sync: calling provider:sync for " .. json_path)
+        provider:sync(server, json_path, log_wrapped_sync_cb("perform_sync", json_path, sync_cb), is_silent)
     else
         UIManager:show(InfoMessage:new {
             text = T(_("No cloud destination set in settings.")),
@@ -122,7 +137,6 @@ function M.sync_annotations(widget, document, json_path, on_complete, force)
     if M.is_async_sync(widget) then
         UIManager:scheduleIn(15, function()
             if not completed then
-                local logger = require("logger")
                 logger.warn("AnnotationSync: sync timed out for " .. (document.file or "unknown"))
                 on_complete_once(false)
             end
@@ -191,13 +205,14 @@ function M.push_progress(widget, json_path, on_complete)
         end
 
         run_silent(function(restore)
-            local success = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
+            logger.dbg("AnnotationSync: push_progress: calling provider:sync for " .. json_path)
+            local success = provider:sync(server, json_path, bound_retries(log_wrapped_sync_cb("push_progress", json_path, function(local_file, cached_file, income_file)
                 cb_called = true
                 local success, local_data = M._sync_progress_callback(widget, local_file, cached_file, income_file)
                 on_complete_once(success)
                 UIManager:nextTick(restore)
                 return success
-            end), true) -- is_silent = true
+            end)), true) -- is_silent = true
 
             if success == false then
                 on_complete_once(false)
@@ -228,16 +243,16 @@ function M.push_progress_bg(widget, json_path, on_complete)
     local server = copy_sync_server(widget)
     if server then
         local Trapper = require("ui/trapper")
-        local logger = require("logger")
         Trapper:wrap(function()
             local completed, success = Trapper:dismissableRunInSubprocess(function()
                 local sync_success = false
                 run_silent(function(restore)
-                    local res = provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
+                    logger.dbg("AnnotationSync: push_progress_bg: calling provider:sync for " .. json_path)
+                    local res = provider:sync(server, json_path, bound_retries(log_wrapped_sync_cb("push_progress_bg", json_path, function(local_file, cached_file, income_file)
                         sync_success = M._sync_progress_callback(widget, local_file, cached_file, income_file)
                         UIManager:nextTick(restore)
                         return sync_success
-                    end), true)
+                    end)), true)
                     if res == false then
                         restore()
                     end
@@ -271,13 +286,14 @@ function M.pull_progress(widget, json_path, on_complete)
 
     local server = copy_sync_server(widget)
     if server then
-        provider:sync(server, json_path, bound_retries(function(local_file, cached_file, income_file)
+        logger.dbg("AnnotationSync: pull_progress: calling provider:sync for " .. json_path)
+        provider:sync(server, json_path, bound_retries(log_wrapped_sync_cb("pull_progress", json_path, function(local_file, cached_file, income_file)
             local success, local_data = M._sync_progress_callback(widget, local_file, cached_file, income_file)
             if on_complete then
                 on_complete(success, local_data)
             end
             return success -- Push merged back to remote
-        end), false) -- is_silent = false
+        end)), false) -- is_silent = false
     else
         if on_complete then
             on_complete(false)
@@ -347,7 +363,8 @@ function M.push_extractor_data(widget, json_path, sync_cb)
         return false
     end
 
-    provider:sync(server, json_path, bound_retries(sync_cb), true) -- is_silent = true
+    logger.dbg("AnnotationSync: push_extractor_data: calling provider:sync for " .. json_path)
+    provider:sync(server, json_path, bound_retries(log_wrapped_sync_cb("push_extractor_data", json_path, sync_cb)), true) -- is_silent = true
     return true
 end
 
