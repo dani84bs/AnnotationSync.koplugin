@@ -243,7 +243,7 @@ function M.push_progress_bg(widget, json_path, on_complete)
                     end
                 end)
                 return sync_success
-            end, false)
+            end, true)
             if completed and not success then
                 logger.info("AnnotationSync: background progress sync failed/unsupported, falling back to in-process sync")
                 M.push_progress(widget, json_path, on_complete)
