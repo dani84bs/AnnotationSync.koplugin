@@ -87,6 +87,21 @@ describe("Background Sync Behavior", function()
         assert.is_true(on_complete_called)
     end)
 
+    it("push_progress_bg resends the dismiss input event", function()
+        local trap_widget_or_string
+        Trapper.dismissableRunInSubprocess = function(this, func, resend_event)
+            trap_widget_or_string = resend_event
+            local success = func()
+            return true, success
+        end
+
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
+            assert.is_true(success)
+        end)
+
+        assert.is_true(trap_widget_or_string)
+    end)
+
     it("push_progress_bg fails silently (no UI) on error", function()
         -- Simulate sync failure
         SyncService.sync = function(server, local_path, callback, upload_only)
