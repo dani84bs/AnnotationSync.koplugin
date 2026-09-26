@@ -6,10 +6,6 @@ AnnotationSync so it merges safely across a user's devices. AnnotationSync
 never parses your format and never writes into your plugin's own files — you
 call in, hand over neutral keyed records, and get the merged result back.
 
-See ADR [`0007-extractor-push-model.md`](adr/0007-extractor-push-model.md)
-for the design rationale, and `CONTEXT.md`'s "Extractors" section for the
-Extractor / Extractor Record / Keyed Merge vocabulary used below.
-
 ## 1. Detect AnnotationSync and listen for sync episodes
 
 ```lua
