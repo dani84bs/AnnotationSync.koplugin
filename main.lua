@@ -1,3 +1,4 @@
+local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
 local InfoMessage = require("ui/widget/infomessage")
@@ -347,7 +348,9 @@ function AnnotationSyncPlugin:manualSync()
         utils.show_msg("A document must be active to do a manual sync.")
         return
     end
-    UIManager:broadcastEvent(Event:new("AnnotationSyncRequested"))
+    if NetworkMgr:isConnected() then
+        UIManager:broadcastEvent(Event:new("AnnotationSyncRequested"))
+    end
     self.manager:syncDocument(document, true)
     self.manager:updateLastSync("Manual Sync")
 end
