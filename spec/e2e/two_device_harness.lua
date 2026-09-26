@@ -1,9 +1,9 @@
 -- Two-device process harness: launches a device-driver e2e spec as a
 -- genuinely separate OS process (a fresh `kodev test front <name>` run,
 -- KO_HOME-isolated the same way koreader's own meson test runner isolates
--- concurrent busted processes -- see docs/adr/0004), waits for it to exit,
--- then returns. Callers run device A to completion before starting device
--- B: sequential, not concurrent (per ADR 0004).
+-- concurrent busted processes), waits for it to exit, then returns. Callers
+-- run device A to completion before starting device B: sequential, not
+-- concurrent.
 local M = {}
 
 local function shell_quote(s)

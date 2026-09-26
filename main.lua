@@ -1,3 +1,4 @@
+local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local Dispatcher = require("dispatcher")
 local InfoMessage = require("ui/widget/infomessage")
@@ -10,6 +11,9 @@ local _ = gettext
 local DataStorage = require("datastorage")
 local logger = require("logger")
 
+local Event = require("ui/event")
+local PluginShare = require("pluginshare")
+
 local remote = require("remote")
 local utils = require("utils")
 local changed_documents = require("changed_documents")
@@ -17,6 +21,7 @@ local settings_sync = require("settings_sync")
 local SyncManager = require("manager")
 local SettingsSelection = require("settings_selection")
 local menus = require("menus")
+local extractor_push = require("extractor_push")
 
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
@@ -114,6 +119,15 @@ function AnnotationSyncPlugin:init()
     end
 
     self:registerEvents()
+
+    -- Blessed cross-plugin call mechanism: Extractors call
+    -- require("pluginshare").AnnotationSync.pushExtractorData(...), and may
+    -- check PluginShare.AnnotationSync ~= nil to detect we're installed.
+    PluginShare.AnnotationSync = {
+        pushExtractorData = function(extractor_id, filename, records, writeback_fn)
+            extractor_push.push(self, extractor_id, filename, records, writeback_fn)
+        end,
+    }
 end
 
 function AnnotationSyncPlugin:saveSettings()
@@ -146,6 +160,9 @@ end
 
 function AnnotationSyncPlugin:_onNetworkConnected()
     logger.dbg("AnnotationSync: handling event: NetworkConnected")
+    -- Fired once per episode regardless of pending documents: Extractor data
+    -- (VocabDeck, Notebook) is independent of document-change state.
+    UIManager:broadcastEvent(Event:new("AnnotationSyncRequested"))
     if changed_documents.has_pending() then
         utils.show_msg("AnnotationSync: Network available, syncing all changed documents")
         UIManager:scheduleIn(1, function()
@@ -330,6 +347,9 @@ function AnnotationSyncPlugin:manualSync()
     if not file then
         utils.show_msg("A document must be active to do a manual sync.")
         return
+    end
+    if NetworkMgr:isConnected() then
+        UIManager:broadcastEvent(Event:new("AnnotationSyncRequested"))
     end
     self.manager:syncDocument(document, true)
     self.manager:updateLastSync("Manual Sync")

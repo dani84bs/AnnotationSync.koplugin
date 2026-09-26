@@ -1,7 +1,7 @@
 -- E2E: two-device reading-progress sync over a real local WebDAV server.
 --
 -- Simulates two genuinely separate devices as two genuinely separate OS
--- processes (see docs/adr/0004-e2e-multi-device-sequential.md): device A
+-- processes: device A
 -- boots, reaches page 5, pushes progress, and exits cleanly; device B
 -- then boots fresh and pulls, correctly seeing device A's page,
 -- percentage, and device label in the "Jump to device progress" menu.

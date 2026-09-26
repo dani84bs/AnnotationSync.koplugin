@@ -20,6 +20,7 @@
 - [Dropbox Setup](#️-dropbox-setup)
 - [Koofr (WebDAV) Setup](#️-koofr-webdav-setup)
 - [Running Tests](#-running-tests)
+- [Writing an Extractor](docs/writing-an-extractor.md)
 - [Contributing](#-contributing)
 
 ---
