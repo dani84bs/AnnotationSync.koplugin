@@ -187,4 +187,33 @@ describe("Background Sync Behavior", function()
         end
         assert.are.equal("ok", result)
     end)
+
+    it("_run_in_background does not keep the parent's listening sockets alive", function()
+        -- e.g. HttpInspector's port must be re-bindable after a FileManager <-> ReaderUI
+        -- switch even while a background push is still running.
+        local socket = require("socket")
+        local server = assert(socket.bind("127.0.0.1", 0))
+        local _, port = server:getsockname()
+
+        local done = false
+        real_run_in_background(function()
+            ffiutil.sleep(2)
+            return "ok"
+        end, function()
+            done = true
+        end)
+        ffiutil.usleep(200000) -- let the child start
+
+        server:close()
+        local rebound, err = socket.bind("127.0.0.1", port)
+        assert.is_truthy(rebound, err)
+        rebound:close()
+
+        local deadline = os.time() + 10
+        while not done and os.time() < deadline do
+            ffiutil.usleep(100000)
+            fastforward_ui_events()
+        end
+        assert.is_true(done)
+    end)
 end)

@@ -234,6 +234,48 @@ end
 local BG_POLL_INTERVAL = 0.25 -- seconds between checks on the background push
 local BG_TIMEOUT = 60 -- seconds before a stuck background push is killed
 
+-- A forked child inherits every fd of its parent, listening sockets included
+-- (e.g. HttpInspector's :8080). While the child lives the port stays bound
+-- even after the parent closes its copy, so re-listening on it fails with
+-- EADDRINUSE. Point inherited listening sockets at /dev/null: dup2 keeps the
+-- fd number taken, so a stale socket object being garbage-collected in the
+-- child can't close an fd the child has since reused.
+local function release_inherited_listeners()
+    local ffi = require("ffi")
+    local C = ffi.C
+    require("ffi/posix_h")
+    pcall(ffi.cdef, "ssize_t readlink(const char *, char *, size_t);")
+    local listening = {}
+    for _, path in ipairs{ "/proc/net/tcp", "/proc/net/tcp6" } do
+        local f = io.open(path, "r")
+        if f then
+            for line in f:lines() do
+                local fields = {}
+                for field in line:gmatch("%S+") do fields[#fields + 1] = field end
+                if fields[4] == "0A" and fields[10] then -- 0A = TCP_LISTEN
+                    listening[fields[10]] = true
+                end
+            end
+            f:close()
+        end
+    end
+    if not next(listening) then return end
+    local devnull = C.open("/dev/null", C.O_RDWR)
+    if devnull < 0 then return end
+    local buf = ffi.new("char[64]")
+    for name in require("libs/libkoreader-lfs").dir("/proc/self/fd") do
+        local fd = tonumber(name)
+        if fd and fd > 2 and fd ~= devnull then
+            local len = C.readlink("/proc/self/fd/" .. name, buf, 63)
+            local inode = len > 0 and ffi.string(buf, len):match("^socket:%[(%d+)%]$")
+            if inode and listening[inode] then
+                C.dup2(devnull, fd)
+            end
+        end
+    end
+    C.close(devnull)
+end
+
 -- Runs task() in a forked child and calls on_done(result) from the UI loop
 -- once it exits. result is the string task() returned, or nil if the fork
 -- failed, the task raised, or it ran past BG_TIMEOUT.
@@ -244,6 +286,7 @@ local BG_TIMEOUT = 60 -- seconds before a stuck background push is killed
 function M._run_in_background(task, on_done)
     local ffiutil = require("ffi/util")
     local pid, read_fd = ffiutil.runInSubProcess(function(_, write_fd)
+        pcall(release_inherited_listeners)
         local ok, result = pcall(task)
         ffiutil.writeToFD(write_fd, ok and tostring(result) or "", true)
     end, true)
