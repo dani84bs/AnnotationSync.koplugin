@@ -168,10 +168,34 @@ describe("Background Sync Behavior", function()
         assert.is_true(on_complete_called)
     end)
 
+    -- Starts the real _run_in_background with UIManager:scheduleIn captured and
+    -- returns a function that runs the captured poll by hand until done() holds.
+    -- fastforward_ui_events() can't drive it: with no widget shown,
+    -- UIManager:handleInput() quits and drops the task queue, rescheduled poll
+    -- included.
+    local function start_real_background(task, on_done)
+        local scheduled = {}
+        local old_scheduleIn = UIManager.scheduleIn
+        UIManager.scheduleIn = function(_, _, fn) table.insert(scheduled, fn) end
+        finally(function() UIManager.scheduleIn = old_scheduleIn end)
+
+        real_run_in_background(task, on_done)
+
+        return function(done)
+            local deadline = os.time() + 10
+            while not done() and os.time() < deadline do
+                ffiutil.usleep(100000)
+                for _ = 1, #scheduled do
+                    table.remove(scheduled, 1)()
+                end
+            end
+        end
+    end
+
     it("_run_in_background returns without waiting for the child", function()
         local result
-        real_run_in_background(function()
-            ffiutil.sleep(0.3)
+        local run_until = start_real_background(function()
+            ffiutil.usleep(300000)
             return "ok"
         end, function(r)
             result = r
@@ -180,11 +204,7 @@ describe("Background Sync Behavior", function()
         -- The caller is not blocked: nothing has been reported yet.
         assert.is_nil(result)
 
-        local deadline = os.time() + 10
-        while result == nil and os.time() < deadline do
-            ffiutil.sleep(0.1)
-            fastforward_ui_events()
-        end
+        run_until(function() return result ~= nil end)
         assert.are.equal("ok", result)
     end)
 
@@ -195,12 +215,12 @@ describe("Background Sync Behavior", function()
         local server = assert(socket.bind("127.0.0.1", 0))
         local _, port = server:getsockname()
 
-        local done = false
-        real_run_in_background(function()
-            ffiutil.sleep(2)
+        local result
+        local run_until = start_real_background(function()
+            ffiutil.usleep(2000000)
             return "ok"
-        end, function()
-            done = true
+        end, function(r)
+            result = r
         end)
         ffiutil.usleep(200000) -- let the child start
 
@@ -209,11 +229,7 @@ describe("Background Sync Behavior", function()
         assert.is_truthy(rebound, err)
         rebound:close()
 
-        local deadline = os.time() + 10
-        while not done and os.time() < deadline do
-            ffiutil.usleep(100000)
-            fastforward_ui_events()
-        end
-        assert.is_true(done)
+        run_until(function() return result ~= nil end)
+        assert.are.equal("ok", result)
     end)
 end)
