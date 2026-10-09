@@ -231,6 +231,103 @@ function M.push_progress(widget, json_path, on_complete)
     end
 end
 
+local BG_POLL_INTERVAL = 0.25 -- seconds between checks on the background push
+local BG_TIMEOUT = 60 -- seconds before a stuck background push is killed
+
+-- A forked child inherits every fd of its parent, listening sockets included
+-- (e.g. HttpInspector's :8080). While the child lives the port stays bound
+-- even after the parent closes its copy, so re-listening on it fails with
+-- EADDRINUSE. Point inherited listening sockets at /dev/null: dup2 keeps the
+-- fd number taken, so a stale socket object being garbage-collected in the
+-- child can't close an fd the child has since reused.
+local function release_inherited_listeners()
+    local ffi = require("ffi")
+    local C = ffi.C
+    require("ffi/posix_h")
+    pcall(ffi.cdef, "ssize_t readlink(const char *, char *, size_t);")
+    local listening = {}
+    for _, path in ipairs{ "/proc/net/tcp", "/proc/net/tcp6" } do
+        local f = io.open(path, "r")
+        if f then
+            for line in f:lines() do
+                local fields = {}
+                for field in line:gmatch("%S+") do fields[#fields + 1] = field end
+                if fields[4] == "0A" and fields[10] then -- 0A = TCP_LISTEN
+                    listening[fields[10]] = true
+                end
+            end
+            f:close()
+        end
+    end
+    if not next(listening) then return end
+    local devnull = C.open("/dev/null", C.O_RDWR)
+    if devnull < 0 then return end
+    local buf = ffi.new("char[64]")
+    for name in require("libs/libkoreader-lfs").dir("/proc/self/fd") do
+        local fd = tonumber(name)
+        if fd and fd > 2 and fd ~= devnull then
+            local len = C.readlink("/proc/self/fd/" .. name, buf, 63)
+            local inode = len > 0 and ffi.string(buf, len):match("^socket:%[(%d+)%]$")
+            if inode and listening[inode] then
+                C.dup2(devnull, fd)
+            end
+        end
+    end
+    C.close(devnull)
+end
+
+-- Runs task() in a forked child and calls on_done(result) from the UI loop
+-- once it exits. result is the string task() returned, or nil if the fork
+-- failed, the task raised, or it ran past BG_TIMEOUT.
+--
+-- Unlike Trapper:dismissableRunInSubprocess this neither blocks the caller
+-- nor puts a TrapWidget on top of the reader: the reader keeps handling
+-- page turns while the network round trip happens in the child.
+function M._run_in_background(task, on_done)
+    local ffiutil = require("ffi/util")
+    local pid, read_fd = ffiutil.runInSubProcess(function(_, write_fd)
+        pcall(release_inherited_listeners)
+        local ok, result = pcall(task)
+        ffiutil.writeToFD(write_fd, ok and tostring(result) or "", true)
+    end, true)
+    if not pid then
+        on_done(nil)
+        return
+    end
+
+    local function collect()
+        if not ffiutil.isSubProcessDone(pid) then
+            UIManager:scheduleIn(5, collect)
+        end
+    end
+
+    local polls_left = math.ceil(BG_TIMEOUT / BG_POLL_INTERVAL)
+    local function poll()
+        local done = ffiutil.isSubProcessDone(pid)
+        if done or ffiutil.getNonBlockingReadSize(read_fd) ~= 0 then
+            local result = ffiutil.readAllFromFD(read_fd)
+            if not done then
+                collect()
+            end
+            on_done(result ~= "" and result or nil)
+            return
+        end
+        polls_left = polls_left - 1
+        if polls_left <= 0 then
+            logger.warn("AnnotationSync: background sync timed out, killing pid " .. pid)
+            ffiutil.terminateSubProcess(pid)
+            UIManager:scheduleIn(5, function()
+                ffiutil.readAllFromFD(read_fd) -- close our end
+                collect()
+            end)
+            on_done(nil)
+            return
+        end
+        UIManager:scheduleIn(BG_POLL_INTERVAL, poll)
+    end
+    UIManager:scheduleIn(BG_POLL_INTERVAL, poll)
+end
+
 function M.push_progress_bg(widget, json_path, on_complete)
     local provider = get_sync_provider(widget)
     if not provider then
@@ -241,38 +338,39 @@ function M.push_progress_bg(widget, json_path, on_complete)
     end
 
     local server = copy_sync_server(widget)
-    if server then
-        local Trapper = require("ui/trapper")
-        Trapper:wrap(function()
-            local completed, success = Trapper:dismissableRunInSubprocess(function()
-                local sync_success = false
-                run_silent(function(restore)
-                    logger.dbg("AnnotationSync: push_progress_bg: calling provider:sync for " .. json_path)
-                    local res = provider:sync(server, json_path, bound_retries(log_wrapped_sync_cb("push_progress_bg", json_path, function(local_file, cached_file, income_file)
-                        sync_success = M._sync_progress_callback(widget, local_file, cached_file, income_file)
-                        UIManager:nextTick(restore)
-                        return sync_success
-                    end)), true)
-                    if res == false then
-                        restore()
-                    end
-                end)
-                return sync_success
-            end, true)
-            if completed and not success then
-                logger.info("AnnotationSync: background progress sync failed/unsupported, falling back to in-process sync")
-                M.push_progress(widget, json_path, on_complete)
-            else
-                if on_complete then
-                    on_complete(completed and success)
-                end
-            end
-        end)
-    else
+    if not server then
         if on_complete then
             on_complete(false)
         end
+        return
     end
+
+    -- The child has no UI loop, so it must use a backend that syncs
+    -- synchronously. cloudstorage.koplugin's Cloud:sync defers the whole
+    -- round trip to UIManager:nextTick and would silently do nothing there;
+    -- core SyncService.sync runs inline and handles webdav/dropbox.
+    if not (has_syncservice and (server.type == "webdav" or server.type == "dropbox")) then
+        logger.dbg("AnnotationSync: push_progress_bg: no synchronous backend, pushing in-process")
+        M.push_progress(widget, json_path, on_complete)
+        return
+    end
+
+    M._run_in_background(function()
+        local sync_success = false
+        logger.dbg("AnnotationSync: push_progress_bg: calling SyncService.sync for " .. json_path)
+        SyncService.sync(server, json_path, bound_retries(log_wrapped_sync_cb("push_progress_bg", json_path, function(local_file, cached_file, income_file)
+            sync_success = M._sync_progress_callback(widget, local_file, cached_file, income_file)
+            return sync_success
+        end)), true)
+        return sync_success and "ok" or "failed"
+    end, function(result)
+        if result ~= "ok" then
+            logger.info("AnnotationSync: background progress sync failed: " .. tostring(result))
+        end
+        if on_complete then
+            on_complete(result == "ok")
+        end
+    end)
 end
 
 function M.pull_progress(widget, json_path, on_complete)

@@ -1,21 +1,24 @@
 describe("Background Sync Behavior", function()
-    local SyncService, UIManager, Trapper
+    local SyncService, UIManager, Trapper, ffiutil
     local remote, json, test_utils
     local test_data_dir = os.getenv("PWD") .. "/test_bg_sync_tmp"
     local old_getDataDir
+    local real_run_in_background
 
     setup(function()
         require("commonrequire")
         local plugin_path = "plugins/AnnotationSync.koplugin/?.lua"
         package.path = plugin_path .. ";" .. package.path
-        
+
         SyncService = require("apps/cloudstorage/syncservice")
         UIManager = require("ui/uimanager")
         Trapper = require("ui/trapper")
+        ffiutil = require("ffi/util")
         json = require("json")
-        
+
         test_utils = require("spec/unit/test_utils")
         remote = require("remote")
+        real_run_in_background = remote._run_in_background
 
         old_getDataDir = test_utils.setup_test_env(test_data_dir)
 
@@ -24,26 +27,34 @@ describe("Background Sync Behavior", function()
     end)
 
     teardown(function()
+        remote._run_in_background = real_run_in_background
         test_utils.teardown_test_env(test_data_dir, old_getDataDir)
         package.loaded["remote"] = nil
     end)
 
     local mock_widget
+    local background_runs
 
     before_each(function()
-        -- Mock Trapper
-        Trapper.wrap = function(this, func)
-            func()
-        end
-        Trapper.dismissableRunInSubprocess = function(this, func, is_blocking)
-            local success = func()
-            return true, success
+        -- Run the background task inline: forking is covered by its own test below.
+        background_runs = 0
+        remote._run_in_background = function(task, on_done)
+            background_runs = background_runs + 1
+            on_done(task())
         end
 
+        -- Mock Trapper
+        Trapper.wrap = spy.new(function(this, func)
+            func()
+        end)
+        Trapper.dismissableRunInSubprocess = spy.new(function(this, func)
+            return true, func()
+        end)
+
         -- Mock SyncService
-        SyncService.sync = function(server, local_path, callback, upload_only)
+        SyncService.sync = spy.new(function(server, local_path, callback, upload_only)
             return callback(local_path, local_path, local_path)
-        end
+        end)
 
         -- Mock UIManager:show to detect notifications
         UIManager.show = spy.new(function() end)
@@ -51,9 +62,9 @@ describe("Background Sync Behavior", function()
         mock_widget = {
             ui = {
                 cloudstorage = {
-                    sync = function(self, server, file_path, sync_cb, is_silent)
-                        return SyncService.sync(server, file_path, sync_cb)
-                    end
+                    sync = spy.new(function(self, server, file_path, sync_cb, is_silent)
+                        return sync_cb(file_path, file_path, file_path)
+                    end)
                 }
             },
             settings = {
@@ -62,19 +73,36 @@ describe("Background Sync Behavior", function()
         }
     end)
 
-    it("push_progress_bg uses Trapper for background execution", function()
-        local wrap_called = false
-        local subprocess_called = false
-        
-        Trapper.wrap = function(this, func)
-            wrap_called = true
-            func()
-        end
-        Trapper.dismissableRunInSubprocess = function(this, func, is_blocking)
-            subprocess_called = true
-            local success = func()
-            return true, success
-        end
+    it("push_progress_bg runs the push in a background subprocess", function()
+        local on_complete_called = false
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
+            on_complete_called = true
+            assert.is_true(success)
+        end)
+
+        assert.are.equal(1, background_runs)
+        assert.spy(SyncService.sync).was_called(1)
+        assert.is_true(on_complete_called)
+    end)
+
+    it("push_progress_bg does not trap input while syncing", function()
+        remote.push_progress_bg(mock_widget, "dummy.json", function() end)
+
+        assert.spy(Trapper.wrap).was_not_called()
+        assert.spy(Trapper.dismissableRunInSubprocess).was_not_called()
+    end)
+
+    it("push_progress_bg uses SyncService in the child, not the deferred cloudstorage sync", function()
+        -- cloudstorage.koplugin's Cloud:sync defers its work to UIManager:nextTick,
+        -- which never runs in a subprocess without a UI loop.
+        remote.push_progress_bg(mock_widget, "dummy.json", function() end)
+
+        assert.spy(SyncService.sync).was_called(1)
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_not_called()
+    end)
+
+    it("push_progress_bg pushes in-process when no synchronous backend handles the server", function()
+        mock_widget.settings.sync_server = { url = "/", type = "ftp" }
 
         local on_complete_called = false
         remote.push_progress_bg(mock_widget, "dummy.json", function(success)
@@ -82,24 +110,9 @@ describe("Background Sync Behavior", function()
             assert.is_true(success)
         end)
 
-        assert.is_true(wrap_called)
-        assert.is_true(subprocess_called)
+        assert.are.equal(0, background_runs)
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_called(1)
         assert.is_true(on_complete_called)
-    end)
-
-    it("push_progress_bg resends the dismiss input event", function()
-        local trap_widget_or_string
-        Trapper.dismissableRunInSubprocess = function(this, func, resend_event)
-            trap_widget_or_string = resend_event
-            local success = func()
-            return true, success
-        end
-
-        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
-            assert.is_true(success)
-        end)
-
-        assert.is_true(trap_widget_or_string)
     end)
 
     it("push_progress_bg fails silently (no UI) on error", function()
@@ -120,26 +133,14 @@ describe("Background Sync Behavior", function()
     end)
 
     it("pull_progress remains synchronous and does NOT use Trapper", function()
-        local wrap_called = false
-        Trapper.wrap = function(this, func)
-            wrap_called = true
-            func()
-        end
-
         remote.pull_progress(mock_widget, "dummy.json", function(success)
             assert.is_true(success)
         end)
 
-        assert.is_false(wrap_called)
+        assert.spy(Trapper.wrap).was_not_called()
     end)
 
     it("sync_annotations remains synchronous and does NOT use Trapper", function()
-        local wrap_called = false
-        Trapper.wrap = function(this, func)
-            wrap_called = true
-            func()
-        end
-
         -- Mock annotations.sync_callback
         local annotations = require("annotations")
         local old_sync_callback = annotations.sync_callback
@@ -149,14 +150,13 @@ describe("Background Sync Behavior", function()
             assert.is_true(success)
         end)
 
-        assert.is_false(wrap_called)
+        assert.spy(Trapper.wrap).was_not_called()
         annotations.sync_callback = old_sync_callback
     end)
 
     it("push_progress_bg handles subprocess crash/interruption", function()
-        Trapper.dismissableRunInSubprocess = function(this, func, is_blocking)
-            -- completed = false, success = nil
-            return false, nil
+        remote._run_in_background = function(task, on_done)
+            on_done(nil)
         end
 
         local on_complete_called = false
@@ -166,5 +166,70 @@ describe("Background Sync Behavior", function()
         end)
 
         assert.is_true(on_complete_called)
+    end)
+
+    -- Starts the real _run_in_background with UIManager:scheduleIn captured and
+    -- returns a function that runs the captured poll by hand until done() holds.
+    -- fastforward_ui_events() can't drive it: with no widget shown,
+    -- UIManager:handleInput() quits and drops the task queue, rescheduled poll
+    -- included.
+    local function start_real_background(task, on_done)
+        local scheduled = {}
+        local old_scheduleIn = UIManager.scheduleIn
+        UIManager.scheduleIn = function(_, _, fn) table.insert(scheduled, fn) end
+        finally(function() UIManager.scheduleIn = old_scheduleIn end)
+
+        real_run_in_background(task, on_done)
+
+        return function(done)
+            local deadline = os.time() + 10
+            while not done() and os.time() < deadline do
+                ffiutil.usleep(100000)
+                for _ = 1, #scheduled do
+                    table.remove(scheduled, 1)()
+                end
+            end
+        end
+    end
+
+    it("_run_in_background returns without waiting for the child", function()
+        local result
+        local run_until = start_real_background(function()
+            ffiutil.usleep(300000)
+            return "ok"
+        end, function(r)
+            result = r
+        end)
+
+        -- The caller is not blocked: nothing has been reported yet.
+        assert.is_nil(result)
+
+        run_until(function() return result ~= nil end)
+        assert.are.equal("ok", result)
+    end)
+
+    it("_run_in_background does not keep the parent's listening sockets alive", function()
+        -- e.g. HttpInspector's port must be re-bindable after a FileManager <-> ReaderUI
+        -- switch even while a background push is still running.
+        local socket = require("socket")
+        local server = assert(socket.bind("127.0.0.1", 0))
+        local _, port = server:getsockname()
+
+        local result
+        local run_until = start_real_background(function()
+            ffiutil.usleep(2000000)
+            return "ok"
+        end, function(r)
+            result = r
+        end)
+        ffiutil.usleep(200000) -- let the child start
+
+        server:close()
+        local rebound, err = socket.bind("127.0.0.1", port)
+        assert.is_truthy(rebound, err)
+        rebound:close()
+
+        run_until(function() return result ~= nil end)
+        assert.are.equal("ok", result)
     end)
 end)
