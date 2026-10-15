@@ -3,8 +3,8 @@
 -- Proves `progress_sync_interval` (manager.lua's `onPageUpdate`) counts
 -- distinct page turns and only schedules a push once the threshold is
 -- crossed -- single-device, EPUB only (page counting is format-agnostic).
--- `remote.push_progress_bg` is monkey-patched to a spy: a real
--- `dismissableRunInSubprocess` round trip needs genuine wall-clock time
+-- `remote.push_progress_bg` is monkey-patched to a spy: a real background
+-- subprocess round trip needs genuine wall-clock time
 -- the harness's `fastforward_ui_events()` can't inject deterministically.
 describe("AnnotationSync E2E progress sync throttle", function()
     local Event, UIManager, docsettings, utils
