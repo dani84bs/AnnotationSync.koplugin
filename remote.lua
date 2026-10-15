@@ -5,6 +5,7 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 local util = require("util")
 local logger = require("logger")
+local time = require("ui/time")
 
 local annotations = require("annotations")
 local utils = require("utils")
@@ -301,7 +302,7 @@ function M._run_in_background(task, on_done)
         end
     end
 
-    local polls_left = math.ceil(BG_TIMEOUT / BG_POLL_INTERVAL)
+    local started = time.now()
     local function poll()
         local done = ffiutil.isSubProcessDone(pid)
         if done or ffiutil.getNonBlockingReadSize(read_fd) ~= 0 then
@@ -312,8 +313,7 @@ function M._run_in_background(task, on_done)
             on_done(result ~= "" and result or nil)
             return
         end
-        polls_left = polls_left - 1
-        if polls_left <= 0 then
+        if time.since(started) >= time.s(BG_TIMEOUT) then
             logger.warn("AnnotationSync: background sync timed out, killing pid " .. pid)
             ffiutil.terminateSubProcess(pid)
             UIManager:scheduleIn(5, function()

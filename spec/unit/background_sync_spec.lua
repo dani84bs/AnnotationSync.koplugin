@@ -181,15 +181,19 @@ describe("Background Sync Behavior", function()
 
         real_run_in_background(task, on_done)
 
-        return function(done)
+        local function run_scheduled()
+            for _ = 1, #scheduled do
+                table.remove(scheduled, 1)()
+            end
+        end
+        local function run_until(done)
             local deadline = os.time() + 10
             while not done() and os.time() < deadline do
                 ffiutil.usleep(100000)
-                for _ = 1, #scheduled do
-                    table.remove(scheduled, 1)()
-                end
+                run_scheduled()
             end
         end
+        return run_until, run_scheduled
     end
 
     it("_run_in_background returns without waiting for the child", function()
@@ -205,6 +209,26 @@ describe("Background Sync Behavior", function()
         assert.is_nil(result)
 
         run_until(function() return result ~= nil end)
+        assert.are.equal("ok", result)
+    end)
+
+    it("_run_in_background times out on elapsed time, not on how often it is polled", function()
+        -- The e2e harness's fastforward_ui_events() fires every scheduled poll at once.
+        local result, reported = nil, false
+        local run_until, run_scheduled = start_real_background(function()
+            ffiutil.usleep(1000000)
+            return "ok"
+        end, function(r)
+            result, reported = r, true
+        end)
+
+        for _ = 1, 300 do
+            if reported then break end
+            run_scheduled()
+        end
+        assert.is_false(reported, "child was given up on before any real time passed")
+
+        run_until(function() return reported end)
         assert.are.equal("ok", result)
     end)
 
