@@ -10,6 +10,7 @@ local utils = require("utils")
 local annotations = require("annotations")
 local changed_documents = require("changed_documents")
 local settings_sync = require("settings_sync")
+local remote = require("remote")
 
 local has_syncservice, SyncService = pcall(require, "apps/cloudstorage/syncservice")
 
@@ -560,6 +561,23 @@ function M.build_main_menu(plugin, menu_items)
                         end,
                         callback = function()
                             plugin.settings.progress_sync = not plugin.settings.progress_sync
+                            plugin:saveSettings()
+                            UIManager:close()
+                        end,
+                    },
+                    {
+                        text = _("Sync in background"),
+                        help_text = _("Pushes progress from a separate process so page turns don't stall. Off by default on macOS and Android, where this can crash the sync process."),
+                        enabled_func = function()
+                            return plugin.ui.cloudstorage ~= nil and plugin.settings.progress_sync
+                                and remote.has_synchronous_backend(plugin.settings.sync_server)
+                        end,
+                        checked_func = function()
+                            return remote.background_push_enabled(plugin.settings.progress_sync_background)
+                        end,
+                        callback = function()
+                            plugin.settings.progress_sync_background =
+                                not remote.background_push_enabled(plugin.settings.progress_sync_background)
                             plugin:saveSettings()
                             UIManager:close()
                         end,

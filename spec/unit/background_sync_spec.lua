@@ -40,7 +40,7 @@ describe("Background Sync Behavior", function()
         background_runs = 0
         remote._run_in_background = function(task, on_done)
             background_runs = background_runs + 1
-            on_done(task())
+            on_done(task(), false)
         end
 
         -- Mock Trapper
@@ -68,7 +68,8 @@ describe("Background Sync Behavior", function()
                 }
             },
             settings = {
-                sync_server = { url = "http://mock-server", type = "webdav" }
+                sync_server = { url = "http://mock-server", type = "webdav" },
+                progress_sync_background = true,
             }
         }
     end)
@@ -132,6 +133,32 @@ describe("Background Sync Behavior", function()
         assert.spy(UIManager.show).was_not_called()
     end)
 
+    describe("background_push_enabled", function()
+        local linux = { os = "Linux", is_android = false }
+        local android = { os = "Linux", is_android = true }
+        local macos = { os = "OSX", is_android = false }
+
+        it("defaults to on for Linux", function()
+            assert.is_true(remote.background_push_enabled(nil, linux))
+        end)
+
+        it("defaults to off for Android", function()
+            assert.is_false(remote.background_push_enabled(nil, android))
+        end)
+
+        it("defaults to off for macOS", function()
+            assert.is_false(remote.background_push_enabled(nil, macos))
+        end)
+
+        it("honours an explicit opt-in on macOS", function()
+            assert.is_true(remote.background_push_enabled(true, macos))
+        end)
+
+        it("honours an explicit opt-out on Linux", function()
+            assert.is_false(remote.background_push_enabled(false, linux))
+        end)
+    end)
+
     it("pull_progress remains synchronous and does NOT use Trapper", function()
         remote.pull_progress(mock_widget, "dummy.json", function(success)
             assert.is_true(success)
@@ -154,18 +181,59 @@ describe("Background Sync Behavior", function()
         annotations.sync_callback = old_sync_callback
     end)
 
-    it("push_progress_bg handles subprocess crash/interruption", function()
-        remote._run_in_background = function(task, on_done)
-            on_done(nil)
-        end
+    it("push_progress_bg pushes in-process when background push is turned off", function()
+        mock_widget.settings.progress_sync_background = false
 
-        local on_complete_called = false
+        local result
         remote.push_progress_bg(mock_widget, "dummy.json", function(success)
-            on_complete_called = true
-            assert.is_false(success)
+            result = success
         end)
 
-        assert.is_true(on_complete_called)
+        assert.are.equal(0, background_runs)
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_called(1)
+        assert.is_true(result)
+    end)
+
+    it("push_progress_bg retries in-process once when the child crashes", function()
+        remote._run_in_background = function(task, on_done)
+            on_done(nil, false)
+        end
+
+        local results = {}
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
+            table.insert(results, success)
+        end)
+
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_called(1)
+        assert.are.same({ true }, results)
+    end)
+
+    it("push_progress_bg does not retry in-process after a timeout", function()
+        remote._run_in_background = function(task, on_done)
+            on_done(nil, true)
+        end
+
+        local results = {}
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
+            table.insert(results, success)
+        end)
+
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_not_called()
+        assert.are.same({ false }, results)
+    end)
+
+    it("push_progress_bg does not retry in-process when the child's push failed", function()
+        remote._run_in_background = function(task, on_done)
+            on_done("failed", false)
+        end
+
+        local results = {}
+        remote.push_progress_bg(mock_widget, "dummy.json", function(success)
+            table.insert(results, success)
+        end)
+
+        assert.spy(mock_widget.ui.cloudstorage.sync).was_not_called()
+        assert.are.same({ false }, results)
     end)
 
     -- Starts the real _run_in_background with UIManager:scheduleIn captured and
@@ -173,13 +241,13 @@ describe("Background Sync Behavior", function()
     -- fastforward_ui_events() can't drive it: with no widget shown,
     -- UIManager:handleInput() quits and drops the task queue, rescheduled poll
     -- included.
-    local function start_real_background(task, on_done)
+    local function start_real_background(task, on_done, timeout)
         local scheduled = {}
         local old_scheduleIn = UIManager.scheduleIn
         UIManager.scheduleIn = function(_, _, fn) table.insert(scheduled, fn) end
         finally(function() UIManager.scheduleIn = old_scheduleIn end)
 
-        real_run_in_background(task, on_done)
+        real_run_in_background(task, on_done, timeout)
 
         local function run_scheduled()
             for _ = 1, #scheduled do
@@ -230,6 +298,35 @@ describe("Background Sync Behavior", function()
 
         run_until(function() return reported end)
         assert.are.equal("ok", result)
+    end)
+
+    it("_run_in_background reports a raising task as a crash, not a timeout", function()
+        local reported, result, timed_out = false
+        local run_until = start_real_background(function()
+            error("boom")
+        end, function(r, t)
+            reported, result, timed_out = true, r, t
+        end)
+
+        run_until(function() return reported end)
+        assert.is_true(reported)
+        assert.is_nil(result)
+        assert.is_false(timed_out)
+    end)
+
+    it("_run_in_background reports a child killed on timeout as timed out", function()
+        local reported, result, timed_out = false
+        local run_until = start_real_background(function()
+            ffiutil.usleep(5000000)
+            return "ok"
+        end, function(r, t)
+            reported, result, timed_out = true, r, t
+        end, 0.3)
+
+        run_until(function() return reported end)
+        assert.is_true(reported)
+        assert.is_nil(result)
+        assert.is_true(timed_out)
     end)
 
     it("_run_in_background does not keep the parent's listening sockets alive", function()

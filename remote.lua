@@ -277,14 +277,15 @@ local function release_inherited_listeners()
     C.close(devnull)
 end
 
--- Runs task() in a forked child and calls on_done(result) from the UI loop
--- once it exits. result is the string task() returned, or nil if the fork
--- failed, the task raised, or it ran past BG_TIMEOUT.
+-- Runs task() in a forked child and calls on_done(result, timed_out) from the
+-- UI loop once it exits. result is nil if the fork failed, the task raised, or
+-- the child was killed on timeout.
 --
 -- Unlike Trapper:dismissableRunInSubprocess this neither blocks the caller
 -- nor puts a TrapWidget on top of the reader: the reader keeps handling
 -- page turns while the network round trip happens in the child.
-function M._run_in_background(task, on_done)
+function M._run_in_background(task, on_done, timeout)
+    timeout = timeout or BG_TIMEOUT
     local ffiutil = require("ffi/util")
     local pid, read_fd = ffiutil.runInSubProcess(function(_, write_fd)
         pcall(release_inherited_listeners)
@@ -292,7 +293,7 @@ function M._run_in_background(task, on_done)
         ffiutil.writeToFD(write_fd, ok and tostring(result) or "", true)
     end, true)
     if not pid then
-        on_done(nil)
+        on_done(nil, false)
         return
     end
 
@@ -310,22 +311,40 @@ function M._run_in_background(task, on_done)
             if not done then
                 collect()
             end
-            on_done(result ~= "" and result or nil)
+            on_done(result ~= "" and result or nil, false)
             return
         end
-        if time.since(started) >= time.s(BG_TIMEOUT) then
+        if time.since(started) >= time.s(timeout) then
             logger.warn("AnnotationSync: background sync timed out, killing pid " .. pid)
             ffiutil.terminateSubProcess(pid)
             UIManager:scheduleIn(5, function()
                 ffiutil.readAllFromFD(read_fd) -- close our end
                 collect()
             end)
-            on_done(nil)
+            on_done(nil, true)
             return
         end
         UIManager:scheduleIn(BG_POLL_INTERVAL, poll)
     end
     UIManager:scheduleIn(BG_POLL_INTERVAL, poll)
+end
+
+-- macOS defaults off: a forked-but-not-exec'd child crashes in Network.framework
+-- on its first DNS lookup. Android defaults off until a fork there is verified.
+function M.background_push_enabled(setting, platform)
+    if setting ~= nil then
+        return setting
+    end
+    platform = platform or { os = jit.os, is_android = require("device"):isAndroid() }
+    return platform.os == "Linux" and not platform.is_android
+end
+
+-- The child has no UI loop, so it must use a backend that syncs
+-- synchronously. cloudstorage.koplugin's Cloud:sync defers the whole
+-- round trip to UIManager:nextTick and would silently do nothing there;
+-- core SyncService.sync runs inline and handles webdav/dropbox.
+function M.has_synchronous_backend(server)
+    return has_syncservice and server ~= nil and (server.type == "webdav" or server.type == "dropbox")
 end
 
 function M.push_progress_bg(widget, json_path, on_complete)
@@ -345,12 +364,9 @@ function M.push_progress_bg(widget, json_path, on_complete)
         return
     end
 
-    -- The child has no UI loop, so it must use a backend that syncs
-    -- synchronously. cloudstorage.koplugin's Cloud:sync defers the whole
-    -- round trip to UIManager:nextTick and would silently do nothing there;
-    -- core SyncService.sync runs inline and handles webdav/dropbox.
-    if not (has_syncservice and (server.type == "webdav" or server.type == "dropbox")) then
-        logger.dbg("AnnotationSync: push_progress_bg: no synchronous backend, pushing in-process")
+    if not (M.background_push_enabled(widget.settings.progress_sync_background)
+            and M.has_synchronous_backend(server)) then
+        logger.dbg("AnnotationSync: push_progress_bg: background push unavailable, pushing in-process")
         M.push_progress(widget, json_path, on_complete)
         return
     end
@@ -363,9 +379,16 @@ function M.push_progress_bg(widget, json_path, on_complete)
             return sync_success
         end)), true)
         return sync_success and "ok" or "failed"
-    end, function(result)
+    end, function(result, timed_out)
         if result ~= "ok" then
             logger.info("AnnotationSync: background progress sync failed: " .. tostring(result))
+        end
+        -- A crashed child never ran the round trip, so retry it here. A timeout
+        -- means the network likely hangs, and retrying would freeze the UI on it.
+        if result == nil and not timed_out then
+            logger.info("AnnotationSync: retrying progress sync in-process")
+            M.push_progress(widget, json_path, on_complete)
+            return
         end
         if on_complete then
             on_complete(result == "ok")

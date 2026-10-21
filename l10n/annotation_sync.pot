@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: AnnotationSync 1.2.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-18 20:27+0000\n"
+"POT-Creation-Date: 2026-10-21 14:37+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: _meta.lua:4 menus.lua:468
+#: _meta.lua:4 menus.lua:469
 msgid "Annotation Sync"
 msgstr ""
 
@@ -45,8 +45,8 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: exclude_dirs.lua:60 manager.lua:477 menus.lua:330 menus.lua:366
-#: menus.lua:414
+#: exclude_dirs.lua:60 manager.lua:477 menus.lua:331 menus.lua:367
+#: menus.lua:415
 msgid "Cancel"
 msgstr ""
 
@@ -54,78 +54,78 @@ msgstr ""
 msgid "Excluded directories for progress sync"
 msgstr ""
 
-#: main.lua:184 main.lua:198 manager.lua:238 manager.lua:279
+#: main.lua:201 main.lua:215 manager.lua:238 manager.lua:279
 msgid "Reading progress sync is not supported on this version of KOReader."
 msgstr ""
 
-#: main.lua:189
+#: main.lua:206
 msgid "A document must be active to jump to device progress."
 msgstr ""
 
-#: main.lua:203
+#: main.lua:220
 msgid "A document must be active to push reading progress."
 msgstr ""
 
-#: main.lua:206
+#: main.lua:223
 msgid "Pushing reading progress..."
 msgstr ""
 
-#: main.lua:209
+#: main.lua:226
 msgid "Reading progress pushed successfully."
 msgstr ""
 
-#: main.lua:211
+#: main.lua:228
 msgid "Failed to push reading progress."
 msgstr ""
 
-#: main.lua:251
+#: main.lua:268
 msgid "AnnotationSync: Manual Sync"
 msgstr ""
 
-#: main.lua:259
+#: main.lua:276
 msgid "AnnotationSync: Push settings to cloud"
 msgstr ""
 
-#: main.lua:260
+#: main.lua:277
 msgid "Push the selected settings to the cloud."
 msgstr ""
 
-#: main.lua:267
+#: main.lua:284
 msgid "AnnotationSync: Pull settings from cloud"
 msgstr ""
 
-#: main.lua:268
+#: main.lua:285
 msgid "Pull the selected settings from the cloud."
 msgstr ""
 
-#: main.lua:275
+#: main.lua:292
 msgid "AnnotationSync: Push reading progress"
 msgstr ""
 
-#: main.lua:283
+#: main.lua:300
 msgid "AnnotationSync: Jump to device progress"
 msgstr ""
 
-#: main.lua:291
+#: main.lua:308
 msgid "AnnotationSync: Sync All"
 msgstr ""
 
-#: main.lua:299
+#: main.lua:316
 msgid "AnnotationSync: Sync All (including unread)"
 msgstr ""
 
-#: main.lua:318
+#: main.lua:335
 msgid ""
 "Cloud destination set to:\n"
 "%1\n"
 "Provider: %2"
 msgstr ""
 
-#: main.lua:368
+#: main.lua:388
 msgid "Annotation restored."
 msgstr ""
 
-#: main.lua:370 menus.lua:45
+#: main.lua:390 menus.lua:46
 msgid "Restored %1 annotations."
 msgstr ""
 
@@ -153,7 +153,7 @@ msgstr ""
 msgid "Open Manager"
 msgstr ""
 
-#: manager.lua:402 menus.lua:67
+#: manager.lua:402 menus.lua:68
 msgid "Close"
 msgstr ""
 
@@ -197,285 +197,295 @@ msgstr ""
 msgid "No hash"
 msgstr ""
 
-#: menus.lua:27
+#: menus.lua:28
 msgid "No deleted annotations found for this document."
 msgstr ""
 
-#: menus.lua:36 menus.lua:42
+#: menus.lua:37 menus.lua:43
 msgid "Restore All"
 msgstr ""
 
-#: menus.lua:40
+#: menus.lua:41
 msgid "Are you sure you want to restore all %1 deleted annotations?"
 msgstr ""
 
-#: menus.lua:54 menus.lua:55
+#: menus.lua:55 menus.lua:56
 msgid "Highlight"
 msgstr ""
 
-#: menus.lua:63
+#: menus.lua:64
 msgid ""
 "Do you want to restore this annotation?\n"
 "\n"
 "Page %1: %2"
 msgstr ""
 
-#: menus.lua:66
+#: menus.lua:67
 msgid "Restore"
 msgstr ""
 
-#: menus.lua:77
+#: menus.lua:78
 msgid "Deleted Annotations"
 msgstr ""
 
-#: menus.lua:111
+#: menus.lua:112
 msgid "(this device)"
 msgstr ""
 
-#: menus.lua:130
+#: menus.lua:131
 msgid "Jumped to page %1 from %2"
 msgstr ""
 
-#: menus.lua:137
+#: menus.lua:138
 msgid "No remote progress found."
 msgstr ""
 
-#: menus.lua:142 menus.lua:726
+#: menus.lua:143 menus.lua:744
 msgid "Jump to device progress"
 msgstr ""
 
-#: menus.lua:182
+#: menus.lua:183
 msgid "No other devices found in cloud settings."
 msgstr ""
 
-#: menus.lua:187 menus.lua:694
+#: menus.lua:188 menus.lua:712
 msgid "Pull settings from cloud"
 msgstr ""
 
-#: menus.lua:225
+#: menus.lua:226
 msgid "No differing settings found for this device."
 msgstr ""
 
-#: menus.lua:237
+#: menus.lua:238
 msgid "Import Selected Settings"
 msgstr ""
 
-#: menus.lua:250
+#: menus.lua:251
 msgid "Successfully imported %1 settings."
 msgstr ""
 
-#: menus.lua:252
+#: menus.lua:253
 msgid "No settings imported."
 msgstr ""
 
-#: menus.lua:262 settings_selection.lua:248
+#: menus.lua:263 settings_selection.lua:248
 msgid "Select All"
 msgstr ""
 
-#: menus.lua:272 settings_selection.lua:262
+#: menus.lua:273 settings_selection.lua:262
 msgid "Clear Selection"
 msgstr ""
 
-#: menus.lua:298
+#: menus.lua:299
 msgid "Settings from %1"
 msgstr ""
 
-#: menus.lua:319
+#: menus.lua:320
 msgid "No other devices found in this document's progress."
 msgstr ""
 
-#: menus.lua:328
+#: menus.lua:329
 msgid "Permanently purge \"%1\" from reading progress sync?"
 msgstr ""
 
-#: menus.lua:329
+#: menus.lua:330
 msgid "Purge"
 msgstr ""
 
-#: menus.lua:341
+#: menus.lua:342
 msgid "Purge device from progress sync"
 msgstr ""
 
-#: menus.lua:355
+#: menus.lua:356
 msgid "No devices purged"
 msgstr ""
 
-#: menus.lua:364
+#: menus.lua:365
 msgid "Stop purging \"%1\" going forward?"
 msgstr ""
 
-#: menus.lua:365
+#: menus.lua:366
 msgid "Un-purge"
 msgstr ""
 
-#: menus.lua:379
+#: menus.lua:380
 msgid "Purged devices"
 msgstr ""
 
-#: menus.lua:388
+#: menus.lua:389
 msgid "No pending documents to sync."
 msgstr ""
 
-#: menus.lua:412
+#: menus.lua:413
 msgid ""
 "Do you want to sync this document?\n"
 "\n"
 "%1"
 msgstr ""
 
-#: menus.lua:413
+#: menus.lua:414
 msgid "Sync now"
 msgstr ""
 
-#: menus.lua:420
+#: menus.lua:421
 msgid "Syncing %1..."
 msgstr ""
 
-#: menus.lua:426
+#: menus.lua:427
 msgid "Successfully synced %1"
 msgstr ""
 
-#: menus.lua:428
+#: menus.lua:429
 msgid "Failed to sync %1"
 msgstr ""
 
-#: menus.lua:435
+#: menus.lua:436
 msgid "Could not open %1 for sync"
 msgstr ""
 
-#: menus.lua:444
+#: menus.lua:445
 msgid "Remove from list"
 msgstr ""
 
-#: menus.lua:447
+#: menus.lua:448
 msgid "Removed %1 from sync list"
 msgstr ""
 
-#: menus.lua:460
+#: menus.lua:461
 msgid "Pending Documents"
 msgstr ""
 
-#: menus.lua:472
+#: menus.lua:473
 msgid "Settings"
 msgstr ""
 
-#: menus.lua:475
+#: menus.lua:476
 msgid "Cloud settings"
 msgstr ""
 
-#: menus.lua:494
+#: menus.lua:495
 msgid "Use filename instead of hash"
 msgstr ""
 
-#: menus.lua:505
+#: menus.lua:506
 msgid "Menu location"
 msgstr ""
 
-#: menus.lua:508
+#: menus.lua:509
 msgid "Tools"
 msgstr ""
 
-#: menus.lua:518
+#: menus.lua:519
 msgid "More tools"
 msgstr ""
 
-#: menus.lua:528
+#: menus.lua:529
 msgid "None (shown as new item)"
 msgstr ""
 
-#: menus.lua:540
+#: menus.lua:541
 msgid "Automatically Sync All when network becomes available"
 msgstr ""
 
-#: menus.lua:554
+#: menus.lua:555
 msgid "Enable Reading Progress Sync"
 msgstr ""
 
-#: menus.lua:568
+#: menus.lua:569
+msgid "Sync in background"
+msgstr ""
+
+#: menus.lua:570
+msgid ""
+"Pushes progress from a separate process so page turns don't stall. Off by "
+"default on macOS and Android, where this can crash the sync process."
+msgstr ""
+
+#: menus.lua:586
 msgid "Sync using last word of page"
 msgstr ""
 
-#: menus.lua:583
+#: menus.lua:601
 msgid "Sync every %1 pages"
 msgstr ""
 
-#: menus.lua:591
+#: menus.lua:609
 msgid "Sync every # pages"
 msgstr ""
 
-#: menus.lua:610
+#: menus.lua:628
 msgid "Manage excluded directories (progress sync)"
 msgstr ""
 
-#: menus.lua:619
+#: menus.lua:637
 msgid "Manage purged devices"
 msgstr ""
 
-#: menus.lua:635
+#: menus.lua:653
 msgid "Device name: %1"
 msgstr ""
 
-#: menus.lua:648
+#: menus.lua:666
 msgid "Set device name"
 msgstr ""
 
-#: menus.lua:649
+#: menus.lua:667
 msgid "Leave empty to use the default device name."
 msgstr ""
 
-#: menus.lua:668
+#: menus.lua:686
 msgid "Show changed settings"
 msgstr ""
 
-#: menus.lua:677
+#: menus.lua:695
 msgid "None"
 msgstr ""
 
-#: menus.lua:678
+#: menus.lua:696
 msgid "Current cloud: %1"
 msgstr ""
 
-#: menus.lua:685
+#: menus.lua:703
 msgid "Push settings to cloud"
 msgstr ""
 
-#: menus.lua:703
+#: menus.lua:721
 msgid "Manual Sync"
 msgstr ""
 
-#: menus.lua:715
+#: menus.lua:733
 msgid "Push reading progress"
 msgstr ""
 
-#: menus.lua:737
+#: menus.lua:755
 msgid "Purge device from progress sync..."
 msgstr ""
 
-#: menus.lua:748
+#: menus.lua:766
 msgid "Sync All"
 msgstr ""
 
-#: menus.lua:760
+#: menus.lua:778
 msgid "Sync All (including unread)"
 msgstr ""
 
-#: menus.lua:773
+#: menus.lua:791
 msgid "Show pending/unsynced documents"
 msgstr ""
 
-#: menus.lua:780
+#: menus.lua:798
 msgid "Show Deleted"
 msgstr ""
 
-#: menus.lua:792
+#: menus.lua:810
 msgid "Last sync: %1"
 msgstr ""
 
-#: menus.lua:796
+#: menus.lua:814
 msgid "Plugin version: %1"
 msgstr ""
 
-#: menus.lua:800
+#: menus.lua:818
 msgid ""
 "%1 (%4)\n"
 "Version: %2\n"
@@ -483,11 +493,11 @@ msgid ""
 "%3"
 msgstr ""
 
-#: menus.lua:809
+#: menus.lua:827
 msgid "Why are some options greyed out?"
 msgstr ""
 
-#: menus.lua:812
+#: menus.lua:830
 msgid ""
 "Reading progress sync features are disabled because your KOReader version "
 "does not support the cloudstorage plugin.\n"
@@ -496,15 +506,15 @@ msgid ""
 "releases)."
 msgstr ""
 
-#: remote.lua:63
+#: remote.lua:78
 msgid "Sync conflict, please try again"
 msgstr ""
 
-#: remote.lua:74
+#: remote.lua:89
 msgid "Cloud Storage plugin is not enabled or available."
 msgstr ""
 
-#: remote.lua:88
+#: remote.lua:104
 msgid "No cloud destination set in settings."
 msgstr ""
 
