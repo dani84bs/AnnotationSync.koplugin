@@ -32,7 +32,7 @@
 - **Settings Synchronization:** Synchronize your KOReader configuration settings (e.g., gesture configurations, page overlap styles, custom hotkeys) across all your devices selectively via your cloud storage.
 - **Smart page alignment for reflowable documents (EPUB):** Sync progress via the page's last word rather than just page numbers to maintain reading consistency across different screen sizes, font settings, margins, or orientations.
 - **Customizable Device Name:** Assign friendly custom names to your devices (e.g., "Bedside Kobo", "Phone") to easily identify them in sync menus.
-- **Automatic background sync:** Quietly updates your progress in the background as you turn pages, preventing intrusive popup messages.
+- **Automatic progress sync:** Quietly pushes your progress as you turn pages, without intrusive popup messages.
 - **Core Cloud Storage Integration:** Integrates with KOReader's cloud storage plugin (Dropbox, FTP, WebDAV, etc.), supporting both the new Cloud storage+ plugin and the legacy SyncService.
 - **Smart merging:** Resolves conflicts by comparing update timestamps to preserve your latest annotations.
 - **Failsafe protection:** Prevents accidental remote data loss when setting up a fresh device.
@@ -122,7 +122,8 @@ On KOReader releases older than 2026.07, without the Cloud storage+ plugin, Anno
 3. Customize your progress sync preferences:
    - **Device name:** Give your device a friendly name under **Device name: [Name]** (e.g. `Bedside Kobo`, `Phone`). Defaults to the hardware model name if left blank.
    - **Sync using last word of page:** Recommended for reflowable formats like EPUB. Keeps tracking consistent even if font sizes or margins differ between devices.
-   - **Sync every # pages:** Customize how frequently progress syncs in the background (default: 1 page turn).
+   - **Sync every # pages:** Customize how frequently progress syncs as you turn pages (default: 1 page turn).
+   - **Sync in background:** Pushes progress from a separate process so page turns don't stall. On by default on Linux devices (Kobo, Kindle, PocketBook, desktop Linux); off by default on macOS and Android, where it can crash the sync process. Only available with a WebDAV or Dropbox destination.
 4. To jump to the progress of another device:
    - Go to **Tools → Annotation Sync → Jump to device progress**.
    - Select a device from the menu (sorted by progress percentage descending, with alphabetical tie-breaking by device name) to jump directly to its reading position.
